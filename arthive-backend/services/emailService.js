@@ -1,0 +1,273 @@
+const { createTransporter, ADMIN_EMAIL } = require('../config/email');
+const jwt = require('jsonwebtoken');
+
+const emailService = {
+  /**
+   * Send artist profile completion notification to admin
+   * @param {Object} artistData - Complete artist information
+   * @param {Array} artworks - Array of uploaded artworks
+   */
+  sendArtistProfileNotification: async (artistData, artworks) => {
+    try {
+      const transporter = createTransporter();
+
+      // Generate secure tokens for approve/reject (valid for 7 days)
+      const approveToken = jwt.sign(
+        { artistId: artistData.id, action: 'approve' },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      const rejectToken = jwt.sign(
+        { artistId: artistData.id, action: 'reject' },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      // Backend URL
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+      const approveLink = `${backendUrl}/api/admin/approve-artist/${approveToken}`;
+      const rejectLink = `${backendUrl}/api/admin/reject-artist/${rejectToken}`;
+
+      // Format artist details for email
+      const artistName = `${artistData.first_name} ${artistData.last_name}`;
+      const artworksList = artworks.map((artwork, index) => 
+        `${index + 1}. ${artwork.title}\n   Image: ${artwork.image_url}`
+      ).join('\n\n');
+
+      // Create email HTML content
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background-color: #f9f9f9; }
+            .section { margin-bottom: 20px; }
+            .label { font-weight: bold; color: #555; }
+            .value { margin-left: 10px; color: #333; }
+            .artwork-list { background-color: white; padding: 15px; border-radius: 5px; }
+            .footer { text-align: center; padding: 15px; color: #777; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>🎨 New Artist Profile Submission</h2>
+            </div>
+            
+            <div class="content">
+              <div class="section">
+                <h3>Artist Information</h3>
+                <p><span class="label">Name:</span> <span class="value">${artistName}</span></p>
+                <p><span class="label">Email:</span> <span class="value">${artistData.email}</span></p>
+                <p><span class="label">Artist ID:</span> <span class="value">${artistData.id}</span></p>
+                ${artistData.bio ? `<p><span class="label">Bio:</span> <span class="value">${artistData.bio}</span></p>` : ''}
+                ${artistData.specialization ? `<p><span class="label">Specialization:</span> <span class="value">${artistData.specialization}</span></p>` : ''}
+                ${artistData.website_url ? `<p><span class="label">Website:</span> <span class="value">${artistData.website_url}</span></p>` : ''}
+                ${artistData.certificate_url ? `<p><span class="label">Certificate:</span> <span class="value">Uploaded</span></p>` : ''}
+                <p><span class="label">Verification Status:</span> <span class="value">${artistData.verification_status || 'pending'}</span></p>
+              </div>
+
+              ${artistData.social_media ? `
+              <div class="section">
+                <h3>Social Media</h3>
+                <p>${JSON.stringify(artistData.social_media, null, 2)}</p>
+              </div>
+              ` : ''}
+
+              <div class="section">
+                <h3>Portfolio Artworks (${artworks.length} items)</h3>
+                <div class="artwork-list">
+                  <pre>${artworksList}</pre>
+                </div>
+              </div>
+
+              <div class="section">
+                <p style="background-color: #fff3cd; padding: 10px; border-radius: 5px;">
+                  <strong>Action Required:</strong> Please review and approve/reject this artist's profile.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${approveLink}" style="display: inline-block; padding: 15px 40px; margin: 10px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    ✅ APPROVE ARTIST
+                  </a>
+                  <a href="${rejectLink}" style="display: inline-block; padding: 15px 40px; margin: 10px; background-color: #f44336; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    ❌ REJECT ARTIST
+                  </a>
+                </div>
+                
+                <p style="font-size: 12px; color: #777; text-align: center;">
+                  Or copy and paste these links in your browser:<br>
+                  Approve: ${approveLink}<br>
+                  Reject: ${rejectLink}
+                </p>
+              </div>
+            </div>
+
+            <div class="footer">
+              <p>ArtHive Admin Notification System</p>
+              <p>Sent on ${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create plain text version
+      const textContent = `
+New Artist Profile Submission
+==============================
+
+Artist Information:
+------------------
+Name: ${artistName}
+Email: ${artistData.email}
+Artist ID: ${artistData.id}
+${artistData.bio ? `Bio: ${artistData.bio}` : ''}
+${artistData.specialization ? `Specialization: ${artistData.specialization}` : ''}
+${artistData.website_url ? `Website: ${artistData.website_url}` : ''}
+${artistData.certificate_url ? `Certificate: Uploaded` : ''}
+Verification Status: ${artistData.verification_status || 'pending'}
+
+Portfolio Artworks (${artworks.length} items):
+${artworksList}
+
+Action Required: 
+Click one of these links to approve or reject this artist:
+
+✅ APPROVE: ${approveLink}
+
+❌ REJECT: ${rejectLink}
+
+---
+ArtHive Admin Notification System
+Sent on ${new Date().toLocaleString()}
+      `;
+
+      // Email options
+      const mailOptions = {
+        from: `"ArtHive Platform" <${process.env.EMAIL_USER}>`,
+        to: ADMIN_EMAIL,
+        subject: `🎨 New Artist Profile: ${artistName}`,
+        text: textContent,
+        html: htmlContent
+      };
+
+      // Send email
+      const info = await transporter.sendMail(mailOptions);
+      
+      console.log('✅ Artist profile notification email sent to admin:', info.messageId);
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Error sending artist profile notification email:', error);
+      // Don't throw error to avoid breaking the main flow
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  /**
+   * Send approval/rejection confirmation email to artist
+   * @param {Object} artistData - Artist information (email, first_name, last_name)
+   * @param {String} status - 'approved' or 'rejected'
+   */
+  sendArtistApprovalEmail: async (artistData, status) => {
+    try {
+      const transporter = createTransporter();
+      const artistName = `${artistData.first_name} ${artistData.last_name}`;
+      const isApproved = status === 'approved';
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: ${isApproved ? '#4CAF50' : '#FF9800'}; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background-color: #f9f9f9; }
+            .footer { text-align: center; padding: 15px; color: #777; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>${isApproved ? '✅ Congratulations!' : '⚠️ Application Update'}</h2>
+            </div>
+            
+            <div class="content">
+              <p>Dear ${artistName},</p>
+              
+              ${isApproved ? `
+                <p>Great news! Your artist profile has been <strong>approved</strong> by the admin.</p>
+                <p>You can now:</p>
+                <ul>
+                  <li>Upload and manage your artworks</li>
+                  <li>View your artist dashboard</li>
+                  <li>Receive orders from buyers</li>
+                </ul>
+                <p>Login to your account to get started!</p>
+              ` : `
+                <p>Thank you for your interest in ArtHive. After careful review, we regret to inform you that your artist application has been <strong>not approved</strong> at this time.</p>
+                <p>If you have questions or would like to reapply, please contact us.</p>
+              `}
+            </div>
+
+            <div class="footer">
+              <p>ArtHive Platform</p>
+              <p>${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const textContent = `
+Dear ${artistName},
+
+${isApproved ? 
+  'Great news! Your artist profile has been approved by the admin.\n\nYou can now upload and manage your artworks, view your artist dashboard, and receive orders from buyers.\n\nLogin to your account to get started!' :
+  'Thank you for your interest in ArtHive. After careful review, we regret to inform you that your artist application has not been approved at this time.\n\nIf you have questions or would like to reapply, please contact us.'
+}
+
+---
+ArtHive Platform
+${new Date().toLocaleString()}
+      `;
+
+      const mailOptions = {
+        from: `"ArtHive Platform" <${process.env.EMAIL_USER}>`,
+        to: artistData.email,
+        subject: isApproved ? '✅ Your Artist Profile is Approved!' : '⚠️ Artist Application Update',
+        text: textContent,
+        html: htmlContent
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Artist ${status} email sent:`, info.messageId);
+      
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Error sending artist approval email:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+};
+
+module.exports = emailService;
