@@ -13,13 +13,13 @@ import {
   Paper,
   Chip,
   CircularProgress,
+  Checkbox,
   } from '@mui/material';
 import {
   Delete as DeleteIcon,
   ShoppingCart as CartIcon,
   Visibility as ViewIcon,
   Favorite as FavoriteIcon,
-  ArrowBack as BackIcon,
 } from '@mui/icons-material';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +28,7 @@ import { useNotification } from '../../context/NotificationContext';
 
 const Wishlist = () => {
   const [loading, setLoading] = useState(true);
+  const [selectedItems, setSelectedItems] = useState(new Set());
   
   const { user, isLoading: authLoading } = useAuth();
   const { addToCart, wishlistItems, removeFromWishlist, loading: cartLoading } = useCart();
@@ -80,6 +81,45 @@ const Wishlist = () => {
     }
   };
 
+  const handleSelectItem = (itemId) => {
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSelectedToCart = async () => {
+    if (selectedItems.size === 0) {
+      notification.showError('Please select at least one item');
+      return;
+    }
+
+    try {
+      const itemsToAdd = wishlistItems.filter(
+        (item) => selectedItems.has(item.artworkId || item.id)
+      );
+
+      await Promise.all(
+        itemsToAdd.map((item) => addToCart(item.artworkId || item.id, 1))
+      );
+
+      await Promise.all(
+        itemsToAdd.map((item) => removeFromWishlist(item.artworkId || item.id))
+      );
+
+      notification.showSuccess(`${itemsToAdd.length} item(s) added to cart!`);
+      setSelectedItems(new Set());
+    } catch (err) {
+      notification.showError('Failed to add selected items to cart');
+      console.error('Error adding to cart:', err);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
@@ -92,46 +132,52 @@ const Wishlist = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Button
-          startIcon={<BackIcon />}
-          onClick={() => navigate(-1)}
-          sx={{ mb: 2 }}
-        >
-          Back
-        </Button>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
+      <Box sx={{ mb: { xs: 3, md: 4 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.25 }}>
+          <Box sx={{ minWidth: 0, pr: 1 }}>
             <Typography variant="h4" component="h1" gutterBottom>
               My Wishlist
             </Typography>
             <Typography variant="body1" color="text.secondary">
               {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved
+              {selectedItems.size > 0 && ` • ${selectedItems.size} selected`}
             </Typography>
           </Box>
           
           {wishlistItems.length > 0 && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={handleClearWishlist}
-            >
-              Clear All
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+              {selectedItems.size >= 2 && (
+                <Button
+                  variant="contained"
+                  startIcon={<CartIcon />}
+                  onClick={handleAddSelectedToCart}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  Add Selected to Cart
+                </Button>
+              )}
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleClearWishlist}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                Clear All
+              </Button>
+            </Box>
           )}
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 4 }} />
+      <Divider sx={{ mb: { xs: 3, md: 4 } }} />
 
       {/* Wishlist Items */}
       {wishlistItems.length === 0 ? (
-        <Paper sx={{ p: 8, textAlign: 'center' }}>
-          <FavoriteIcon sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
+        <Paper sx={{ p: { xs: 4, md: 8 }, textAlign: 'center' }}>
+          <FavoriteIcon sx={{ fontSize: { xs: 60, md: 80 }, color: 'text.disabled', mb: 2 }} />
           <Typography variant="h5" gutterBottom>
             Your wishlist is empty
           </Typography>
@@ -148,31 +194,46 @@ const Wishlist = () => {
           </Button>
         </Paper>
       ) : (
-        <Grid container spacing={3}>
-          {wishlistItems.map((item) => (
+        <Grid container spacing={{ xs: 1.5, md: 2 }}>
+          {wishlistItems.map((item) => {
+            const itemId = item.artworkId || item.id;
+            const isSelected = selectedItems.has(itemId);
+            return (
             <Grid item xs={12} key={item.id}>
-              <Card sx={{ display: 'flex', height: 200 }}>
-                {/* Artwork Image */}
-                <CardMedia
-                  component="img"
-                  sx={{ width: 200, cursor: 'pointer' }}
-                  image={item.image}
-                  alt={item.title}
-                  onClick={() => navigate(`/artwork/${item.artworkId}`)}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Checkbox
+                  checked={isSelected}
+                  onChange={() => handleSelectItem(itemId)}
+                  sx={{ flexShrink: 0 }}
                 />
+                <Card sx={{ display: 'flex', flexDirection: 'row', minHeight: { xs: 108, sm: 170 }, overflow: 'hidden', flex: 1 }}>
+                  {/* Artwork Image */}
+                  <CardMedia
+                    component="img"
+                    sx={{ width: { xs: 82, sm: 170 }, height: { xs: 108, sm: 'auto' }, cursor: 'pointer', flexShrink: 0 }}
+                    image={item.image}
+                    alt={item.title}
+                    onClick={() => navigate(`/artwork/${item.artworkId}`)}
+                  />
                 
-                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <CardContent sx={{ flex: '1 0 auto' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                  <CardContent sx={{ flex: '1 0 auto', p: { xs: 0.75, sm: 1.5 }, pb: { xs: 0.4, sm: 0.75 } }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: { xs: 0.5, sm: 0 } }}>
+                      <Box sx={{ minWidth: 0, pr: 0.5 }}>
                         <Typography
-                          variant="h6"
+                          variant="subtitle1"
                           component={Link}
                           to={`/artwork/${item.artworkId}`}
                           sx={{
                             textDecoration: 'none',
                             color: 'inherit',
                             '&:hover': { color: 'primary.main' },
+                            fontWeight: 700,
+                            fontSize: { xs: '0.86rem', sm: '1rem' },
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                           }}
                         >
                           {item.title}
@@ -186,37 +247,43 @@ const Wishlist = () => {
                           sx={{
                             textDecoration: 'none',
                             '&:hover': { textDecoration: 'underline' },
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: 'block',
+                            fontSize: { xs: '0.78rem', sm: '0.875rem' },
                           }}
                         >
                           {item.artist?.name || item.artist}
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.45, mb: 0.45, flexWrap: 'wrap' }}>
                           <Chip label={item.category} size="small" />
-                          <Chip label={item.medium} size="small" variant="outlined" />
+                          <Chip label={item.medium} size="small" variant="outlined" sx={{ display: { xs: 'none', sm: 'inline-flex' } }} />
                         </Box>
                         
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.72rem', sm: '0.875rem' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {item.year} • {item.dimensions}
                         </Typography>
                       </Box>
                       
-                      <Typography variant="h6" color="primary">
+                      <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 700, fontSize: { xs: '0.98rem', sm: '1rem' }, lineHeight: 1, whiteSpace: 'nowrap' }}>
                         ${item.price.toLocaleString()}
                       </Typography>
                     </Box>
                     
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2, fontSize: { xs: '0.66rem', sm: '0.75rem' } }}>
                       Added on {new Date(item.addedDate).toLocaleDateString()}
                     </Typography>
                   </CardContent>
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, pt: 0 }}>
-                    <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: { xs: 0.75, sm: 1.5 }, pt: 0, flexDirection: 'row', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                    <Box sx={{ flexShrink: 0, display: { xs: 'none', sm: 'flex' } }}>
                       <IconButton
                         aria-label="view artwork"
                         onClick={() => navigate(`/artwork/${item.artworkId}`)}
-                        sx={{ mr: 1 }}
+                        size="small"
+                        sx={{ mr: 0.5 }}
                       >
                         <ViewIcon />
                       </IconButton>
@@ -225,6 +292,7 @@ const Wishlist = () => {
                         aria-label="remove from wishlist"
                         onClick={() => handleRemoveFromWishlist(item.artworkId || item.id)}
                         color="error"
+                        size="small"
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -234,24 +302,57 @@ const Wishlist = () => {
                       variant="contained"
                       startIcon={<CartIcon />}
                       onClick={() => handleMoveToCart(item)}
+                      sx={{
+                        ml: 'auto',
+                        minWidth: 0,
+                        maxWidth: '100%',
+                        px: { xs: 0.75, sm: 1.5 },
+                        whiteSpace: 'nowrap',
+                        flexShrink: 1,
+                        fontSize: { xs: '0.7rem', sm: '0.8125rem' },
+                        '& .MuiButton-startIcon': { mr: { xs: 0.35, sm: 1 }, ml: 0 },
+                        display: { xs: 'none', sm: 'inline-flex' },
+                      }}
+                      size="small"
                     >
                       Move to Cart
                     </Button>
+
+                    <Box sx={{ display: { xs: 'flex', sm: 'none' }, gap: 0.5, ml: 'auto' }}>
+                      <IconButton
+                        aria-label="view artwork"
+                        onClick={() => navigate(`/artwork/${item.artworkId}`)}
+                        size="small"
+                      >
+                        <ViewIcon />
+                      </IconButton>
+
+                      <IconButton
+                        aria-label="remove from wishlist"
+                        onClick={() => handleRemoveFromWishlist(item.artworkId || item.id)}
+                        color="error"
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
                   </Box>
                 </Box>
               </Card>
+              </Box>
             </Grid>
-          ))}
+            );
+          })}
         </Grid>
       )}
 
       {/* Summary */}
       {wishlistItems.length > 0 && (
-        <Paper sx={{ p: 3, mt: 4 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, mt: 4 }}>
           <Typography variant="h6" gutterBottom>
             Wishlist Summary
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1.5, sm: 0 } }}>
             <Typography variant="body1">
               Total value: <strong>${wishlistItems.reduce((sum, item) => sum + item.price, 0).toLocaleString()}</strong>
             </Typography>
@@ -259,27 +360,36 @@ const Wishlist = () => {
               variant="contained"
               color="primary"
               size="large"
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
               onClick={async () => {
                 try {
-                  // Add all items to cart and remove from wishlist
+                  // If items are selected, add only selected items; otherwise add all
+                  const itemsToProcess = selectedItems.size > 0 
+                    ? wishlistItems.filter(item => selectedItems.has(item.artworkId || item.id))
+                    : wishlistItems;
+
                   await Promise.all(
-                    wishlistItems.map(item => 
+                    itemsToProcess.map(item => 
                       addToCart(item.artworkId || item.id, 1)
                     )
                   );
                   await Promise.all(
-                    wishlistItems.map(item => 
+                    itemsToProcess.map(item => 
                       removeFromWishlist(item.artworkId || item.id)
                     )
                   );
-                  notification.showSuccess('All items moved to cart!');
+                  
+                  notification.showSuccess(`${itemsToProcess.length} item(s) moved to cart!`);
+                  if (selectedItems.size > 0) {
+                    setSelectedItems(new Set());
+                  }
                 } catch (err) {
                   notification.showError('Failed to move items to cart');
                   console.error('Error moving items:', err);
                 }
               }}
             >
-              Add All to Cart
+              {selectedItems.size > 0 ? `Add Selected (${selectedItems.size}) to Cart` : 'Add All to Cart'}
             </Button>
           </Box>
         </Paper>

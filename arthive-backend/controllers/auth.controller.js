@@ -3,6 +3,17 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const emailService = require('../services/emailService');
 
+const ensureArtistProfileColumns = async () => {
+  await db.query(`
+    ALTER TABLE artists
+    ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS address TEXT,
+    ADD COLUMN IF NOT EXISTS phone_number VARCHAR(30)
+  `);
+};
+
 const authController = {
   // -------------------- REGISTER --------------------
   register: async (req, res, next) => {
@@ -234,10 +245,13 @@ const authController = {
   // -------------------- GET PROFILE --------------------
   getProfile: async (req, res) => {
     try {
+      await ensureArtistProfileColumns();
+
       const user = await db.query(
         `SELECT u.id, u.email, u.first_name, u.last_name, u.user_type, 
                 u.profile_pic_url, u.status, u.created_at,
                 a.bio, a.website_url, a.social_media, a.verification_status,
+                a.city, a.country, a.contact_email, a.address, a.phone_number,
                 a.total_artworks, a.total_sales
          FROM users u
          LEFT JOIN artists a ON u.id = a.id
@@ -269,6 +283,11 @@ const authController = {
           bio: user.rows[0].bio,
           website_url: user.rows[0].website_url,
           social_media: user.rows[0].social_media,
+          city: user.rows[0].city,
+          country: user.rows[0].country,
+          contact_email: user.rows[0].contact_email,
+          address: user.rows[0].address,
+          phone_number: user.rows[0].phone_number,
           verification_status: user.rows[0].verification_status,
           total_artworks: user.rows[0].total_artworks,
           total_sales: user.rows[0].total_sales
@@ -292,10 +311,35 @@ const authController = {
   // -------------------- UPDATE PROFILE --------------------
   updateProfile: async (req, res) => {
     try {
-      const { first_name, last_name, profile_pic_url, bio, website_url, social_media } = req.body;
-      const userId = req.user.id;
+      await ensureArtistProfileColumns();
 
-      const shouldNotifyAdmin = req.user.user_type === 'artist' && (bio || website_url || social_media);
+      const {
+        first_name,
+        last_name,
+        profile_pic_url,
+        bio,
+        website_url,
+        social_media,
+        city,
+        country,
+        contact_email,
+        address,
+        phone_number
+      } = req.body;
+      const userId = req.user.id;
+      const uploadedProfilePicUrl = req.file ? `/uploads/profile_pics/${req.file.filename}` : null;
+      const resolvedProfilePicUrl = uploadedProfilePicUrl || profile_pic_url;
+
+      const hasArtistProfileUpdate =
+        bio !== undefined ||
+        website_url !== undefined ||
+        social_media !== undefined ||
+        city !== undefined ||
+        country !== undefined ||
+        contact_email !== undefined ||
+        address !== undefined ||
+        phone_number !== undefined;
+      const shouldNotifyAdmin = req.user.user_type === 'artist' && hasArtistProfileUpdate;
 
       // Update users table
       const updatedUser = await db.query(
@@ -306,22 +350,32 @@ const authController = {
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $4
          RETURNING id, email, first_name, last_name, user_type, profile_pic_url, status`,
-        [first_name, last_name, profile_pic_url, userId]
+        [first_name, last_name, resolvedProfilePicUrl, userId]
       );
 
       // If user is artist and provided artist data, update artists table and push to pending review (unless already verified)
-      if (req.user.user_type === 'artist' && (bio || website_url || social_media)) {
+      if (req.user.user_type === 'artist' && hasArtistProfileUpdate) {
         await db.query(
           `UPDATE artists 
            SET bio = COALESCE($1, bio),
                website_url = COALESCE($2, website_url),
                social_media = COALESCE($3, social_media),
+               city = COALESCE($4, city),
+               country = COALESCE($5, country),
+               contact_email = COALESCE($6, contact_email),
+               address = COALESCE($7, address),
+               phone_number = COALESCE($8, phone_number),
                verification_status = CASE WHEN verification_status != 'verified' THEN 'pending' ELSE verification_status END
-           WHERE id = $4`,
+           WHERE id = $9`,
           [
             bio,
             website_url,
             social_media ? JSON.stringify(social_media) : null,
+            city,
+            country,
+            contact_email,
+            address,
+            phone_number,
             userId
           ]
         );
@@ -331,7 +385,8 @@ const authController = {
       if (shouldNotifyAdmin) {
         try {
           const artistRes = await db.query(
-            'SELECT id, bio, website_url, social_media, verification_status FROM artists WHERE id = $1',
+            `SELECT id, bio, website_url, social_media, city, country, contact_email, address, phone_number, verification_status
+             FROM artists WHERE id = $1`,
             [userId]
           );
 
@@ -345,6 +400,11 @@ const authController = {
             bio: artistInfo?.bio || bio,
             website_url: artistInfo?.website_url || website_url,
             social_media: artistInfo?.social_media || (social_media ? JSON.stringify(social_media) : null),
+            city: artistInfo?.city || city,
+            country: artistInfo?.country || country,
+            contact_email: artistInfo?.contact_email || contact_email,
+            address: artistInfo?.address || address,
+            phone_number: artistInfo?.phone_number || phone_number,
             verification_status: artistInfo?.verification_status || 'pending'
           };
 

@@ -1,6 +1,14 @@
 const db = require("../config/db");
 const emailService = require("../services/emailService");
 
+const ensureArtistPortfolioColumns = async () => {
+  await db.query(`
+    ALTER TABLE artists
+    ADD COLUMN IF NOT EXISTS specialization TEXT,
+    ADD COLUMN IF NOT EXISTS certificate_url TEXT
+  `);
+};
+
 const artistController = {
   // Create new artwork
   createArtwork: async (req, res) => {
@@ -494,6 +502,8 @@ const artistController = {
     try {
       const artistId = req.user.id;
 
+      await ensureArtistPortfolioColumns();
+
       // Ensure files were provided
       const images = (req.files && req.files.images) || [];
       const certificate = (req.files && req.files.certificate && req.files.certificate[0]) || null;
@@ -518,14 +528,15 @@ const artistController = {
         const imageUrl = `/uploads/artist_portfolio/${file.filename}`;
         const result = await db.query(
           `INSERT INTO artworks (
-            artist_id, title, description, image_url, status, created_at
-          ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+            artist_id, title, description, image_url, price, status, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
           RETURNING *`,
           [
             artistId,
             file.originalname || `Artwork_${Date.now()}`,
             specialization && specialization.trim() ? specialization.trim() : null,
             imageUrl,
+            0,
             'pending'
           ]
         );
@@ -538,15 +549,13 @@ const artistController = {
         [images.length, artistId]
       );
 
-      // Add specialization column if not exists, then update
+      // Update specialization
       if (typeof specialization === 'string' && specialization.trim().length > 0) {
-        await db.query("ALTER TABLE artists ADD COLUMN IF NOT EXISTS specialization TEXT");
         await db.query('UPDATE artists SET specialization = $1 WHERE id = $2', [specialization.trim(), artistId]);
       }
 
       // Handle certificate file if provided
       if (certificate) {
-        await db.query("ALTER TABLE artists ADD COLUMN IF NOT EXISTS certificate_url TEXT");
         const certRel = `/uploads/artist_portfolio/${certificate.filename}`;
         await db.query('UPDATE artists SET certificate_url = $1 WHERE id = $2', [certRel, artistId]);
       }
@@ -587,7 +596,11 @@ const artistController = {
 
     } catch (error) {
       console.error('Upload portfolio error:', error);
-      res.status(500).json({ success: false, message: 'Failed to upload portfolio' });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload portfolio',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   },
 

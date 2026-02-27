@@ -22,7 +22,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve uploaded files (artist portfolio, etc.)
 const path = require('path');
 const uploadsPath = path.join(__dirname, 'uploads');
-app.use('/uploads', express.static(uploadsPath));
+app.use('/uploads', express.static(uploadsPath, {
+  etag: false,
+  lastModified: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  },
+}));
 
 // Disable ETag to prevent 304 responses
 app.disable('etag');

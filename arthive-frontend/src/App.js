@@ -14,6 +14,7 @@ import ArtistDashboard from "./pages/artist/ArtistDashboard";
 import UploadArtworks from "./pages/artist/UploadArtworks";
 import ArtworkGallery from "./components/Artwork/ArtworkGallery";
 import ArtworkDetail from "./pages/artwork/ArtworkDetail";
+import Checkout from "./pages/checkout/Checkout";
 import Cart from "./pages/user/Cart";
 import Wishlist from "./pages/user/Wishlist";
 import Profile from "./pages/user/Profile";
@@ -46,6 +47,7 @@ function App() {
               <Route path="artist/upload" element={<UploadArtworks />} />
               <Route path="artworks" element={<ArtworkGallery />} />
               <Route path="artwork/:id" element={<ArtworkDetail />} />
+              <Route path="checkout" element={<Checkout />} />
               <Route path="cart" element={<Cart />} />
               <Route path="wishlist" element={<Wishlist />} />
               <Route path="profile" element={<Profile />} />

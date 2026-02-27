@@ -8,6 +8,9 @@ router.get("/categories", buyerController.getCategories);
 router.get("/artworks", buyerController.getArtworks);
 router.get("/artworks/:id", buyerController.getArtworkById);
 router.get("/artists", buyerController.getPublicArtists);
+router.get("/artists/:id", buyerController.getPublicArtistById);
+router.get("/artists/:id/artworks", buyerController.getPublicArtistArtworks);
+router.get("/stats", buyerController.getHomeStats);
 
 // Apply auth middleware to protected routes
 router.use(auth.verifyToken);

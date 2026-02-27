@@ -71,7 +71,10 @@ export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
-  updateProfile: (userData) => api.put('/auth/profile', userData),
+  updateProfile: (userData) => {
+    const isFormData = typeof FormData !== 'undefined' && userData instanceof FormData;
+    return api.put('/auth/profile', userData, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+  },
 };
 
 export const artworkAPI = {
@@ -85,8 +88,8 @@ export const artworkAPI = {
 
 export const artistAPI = {
   getAll: (params) => api.get('/buyer/artists', { params }),
-  getById: (id) => api.get(`/artists/${id}`),
-  getArtworks: (artistId) => api.get(`/artists/${artistId}/artworks`),
+  getById: (id) => api.get(`/buyer/artists/${id}`),
+  getArtworks: (artistId, params) => api.get(`/buyer/artists/${artistId}/artworks`, { params }),
   getArtistArtworks: () => api.get('/artist/artworks'),
   getDashboardStats: () => api.get('/artist/dashboard'),
   uploadPortfolio: (formData, config = {}) => api.post('/artist/portfolio', formData, { headers: { 'Content-Type': 'multipart/form-data' }, ...config }),
@@ -120,58 +123,17 @@ export const buyerAPI = {
   searchArtworks: (query, params = {}) => api.get('/buyer/artworks', { params: { search: query, ...params } }),
   getCategories: () => api.get('/buyer/categories'),
   getArtists: (params) => api.get('/buyer/artists', { params }),
+  getHomeStats: () => api.get('/buyer/stats'),
 };
 
 export const adminAPI = {
   getPendingArtworks: (params) => api.get('/admin/artworks', { params }),
   updateArtworkStatus: (id, status) => api.put(`/admin/artworks/${id}`, { status }),
   getPendingArtists: (params) => api.get('/admin/artists', { params }),
+  getArtistProfileDetails: (id) => api.get(`/admin/artists/${id}/profile`),
   updateArtistStatus: (id, verification_status) => api.put(`/admin/artists/${id}`, { verification_status }),
   getAllBuyers: (params) => api.get('/admin/buyers', { params }),
   getDashboardStats: () => api.get('/admin/stats'),
-};
-
-// Mock data for development (remove when connecting to real API)
-export const mockData = {
-  artworks: [
-    {
-      id: 1,
-      title: 'Abstract Dreams',
-      artist: 'Sarah Chen',
-      artistId: 1,
-      price: 1200,
-      image: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&auto=format&fit=crop',
-      category: 'painting',
-      medium: 'Oil on canvas',
-      year: 2023,
-      dimensions: '24" x 36"',
-      description: 'A vibrant abstract piece exploring dreams and reality.',
-      stock: 5,
-      views: 1420,
-      likes: 256,
-      rating: 4.8,
-      tags: ['abstract', 'colorful', 'modern'],
-    },
-    // Add more mock data as needed
-  ],
-  artists: [
-    {
-      id: 1,
-      name: 'Sarah Chen',
-      title: 'Abstract Expressionist',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&auto=format&fit=crop',
-      bio: 'Contemporary artist exploring abstract forms and colors.',
-      location: 'New York, USA',
-      artworksCount: 42,
-      followers: 1240,
-      rating: 4.9,
-      socialLinks: {
-        website: 'https://sarahchen.art',
-        instagram: '@sarahchenart',
-      },
-    },
-    // Add more mock data as needed
-  ],
 };
 
 // Helper function to check if user is authenticated

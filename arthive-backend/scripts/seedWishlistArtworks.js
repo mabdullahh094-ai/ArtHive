@@ -31,7 +31,7 @@ const mockArtworks = [
     title: 'Serenity',
     description: 'A peaceful marble sculpture',
     price: 2100,
-    imageUrl: 'https://images.unsplash.com/photo-1543857778-c4a1a569e388?w=800&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=800&q=80',
     artistId: 4,
     categoryId: 3,
     medium: 'Marble',

@@ -64,17 +64,17 @@ const Header = () => {
       }}
     >
       <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ py: 1.5, alignItems: 'center', gap: 2 }}>
-          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none' }}>
-            <Box
-              sx={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 50%, #f59e0b 100%)',
-              }}
-            />
-            <Typography variant="h5" fontWeight={800} letterSpacing={0.4} color="text.primary">
+        <Toolbar disableGutters sx={{ py: { xs: 1, sm: 1.5 }, alignItems: 'center', gap: { xs: 1, sm: 2 } }}>
+          <IconButton
+            sx={{ display: { xs: 'inline-flex', lg: 'none' }, mr: { xs: 0.25, sm: 0.75 }, p: { xs: 0.8, sm: 1.2 } }}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Toggle navigation"
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Box component={Link} to="/" sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <Typography variant="h5" fontWeight={800} letterSpacing={0.4} color="text.primary" sx={{ fontSize: { xs: '1.05rem', sm: '1.5rem' } }}>
               Arthive
             </Typography>
           </Box>
@@ -98,29 +98,29 @@ const Header = () => {
             ))}
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>
-            <IconButton color="inherit" size="large" component={Link} to="/artworks" sx={{ color: 'text.secondary' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, sm: 1 }, ml: 'auto' }}>
+            <IconButton color="inherit" size="large" component={Link} to="/artworks" sx={{ color: 'text.secondary', p: { xs: 0.8, sm: 1.2 } }}>
               <Search />
             </IconButton>
 
-            <IconButton component={Link} to="/wishlist" color="inherit" sx={{ color: 'text.secondary' }}>
+            <IconButton component={Link} to="/wishlist" color="inherit" sx={{ color: 'text.secondary', p: { xs: 0.8, sm: 1.2 } }}>
               <Favorite />
             </IconButton>
 
-            <IconButton component={Link} to="/cart" color="inherit" sx={{ color: 'text.secondary' }}>
+            <IconButton component={Link} to="/cart" color="inherit" sx={{ color: 'text.secondary', p: { xs: 0.8, sm: 1.2 } }}>
               <Badge badgeContent={cartItems.length} color="error">
                 <ShoppingCart />
               </Badge>
             </IconButton>
 
             {user && (
-              <IconButton component={Link} to="/profile" color="inherit" sx={{ color: 'text.secondary' }} aria-label="My Account">
+              <IconButton component={Link} to="/profile" color="inherit" sx={{ color: 'text.secondary', p: { xs: 0.8, sm: 1.2 }, display: { xs: 'none', sm: 'inline-flex' } }} aria-label="My Account">
                 <AccountCircle />
               </IconButton>
             )}
 
             {user ? (
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
                 <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'inline-flex' }, color: 'text.secondary' }}>
                   Hi, {user.first_name || user.name || user.email}
                 </Typography>
@@ -128,27 +128,19 @@ const Header = () => {
                 <Button size="small" variant="outlined" onClick={handleLogout}>Logout</Button>
               </Stack>
             ) : (
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
                 <Button size="small" component={Link} to="/login" color="inherit">Log in</Button>
                 <Button size="small" variant="contained" component={Link} to="/register">
                   Join Arthive
                 </Button>
               </Stack>
             )}
-
-            <IconButton
-              sx={{ display: { xs: 'inline-flex', lg: 'none' }, ml: 1 }}
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Toggle navigation"
-            >
-              <MenuIcon />
-            </IconButton>
           </Box>
         </Toolbar>
       </Container>
 
-      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <Box sx={{ width: 280, p: 2 }}>
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 280, p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
           <Box component={Link} to="/" onClick={() => setDrawerOpen(false)} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
             <Typography variant="h6" fontWeight={700}>Arthive</Typography>
           </Box>
@@ -162,24 +154,26 @@ const Header = () => {
               </ListItem>
             ))}
           </List>
-          <Divider sx={{ my: 1 }} />
-          {user ? (
-            <Stack spacing={1}>
-              <Button fullWidth component={Link} to="/profile" onClick={() => setDrawerOpen(false)}>
-                My Account
-              </Button>
-              <Button fullWidth variant="outlined" onClick={handleLogout}>Logout</Button>
-            </Stack>
-          ) : (
-            <Stack spacing={1}>
-              <Button fullWidth variant="contained" component={Link} to="/register" onClick={() => setDrawerOpen(false)}>
-                Join Arthive
-              </Button>
-              <Button fullWidth component={Link} to="/login" onClick={() => setDrawerOpen(false)}>
-                Log in
-              </Button>
-            </Stack>
-          )}
+          <Box sx={{ mt: 'auto' }}>
+            <Divider sx={{ my: 1 }} />
+            {user ? (
+              <Stack spacing={1}>
+                <Button fullWidth component={Link} to="/profile" onClick={() => setDrawerOpen(false)}>
+                  My Account
+                </Button>
+                <Button fullWidth variant="outlined" onClick={handleLogout}>Logout</Button>
+              </Stack>
+            ) : (
+              <Stack spacing={1}>
+                <Button fullWidth component={Link} to="/login" onClick={() => setDrawerOpen(false)}>
+                  Log in
+                </Button>
+                <Button fullWidth variant="contained" component={Link} to="/register" onClick={() => setDrawerOpen(false)}>
+                  Join Arthive
+                </Button>
+              </Stack>
+            )}
+          </Box>
         </Box>
       </Drawer>
     </AppBar>

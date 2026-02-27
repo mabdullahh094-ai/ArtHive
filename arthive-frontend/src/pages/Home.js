@@ -12,7 +12,6 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
   IconButton,
   CircularProgress,
 } from '@mui/material';
@@ -29,7 +28,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { buyerAPI, artistAPI } from '../services/api';
+import { buyerAPI } from '../services/api';
 
 const Home = () => {
   const notification = useNotification();
@@ -37,17 +36,32 @@ const Home = () => {
   const { isAuthenticated } = useAuth();
   const { addToCart, addToWishlist, removeFromWishlist, wishlistItems } = useCart();
   const [artworks, setArtworks] = useState([]);
-  const [featuredArtists, setFeaturedArtists] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [homeStats, setHomeStats] = useState({
+    curated_artworks: 0,
+    verified_artists: 0,
+    monthly_collectors: 0,
+    countries_count: 0,
+  });
 
   const statHighlights = [
-    { label: 'Curated artworks', value: '12k+', accent: '#2563eb' },
-    { label: 'Verified artists', value: '2.1k', accent: '#f59e0b' },
-    { label: 'Monthly collectors', value: '48k', accent: '#16a34a' },
+    { label: 'Curated artworks', value: homeStats.curated_artworks, accent: '#2563eb' },
+    { label: 'Verified artists', value: homeStats.verified_artists, accent: '#f59e0b' },
+    { label: 'Monthly collectors', value: homeStats.monthly_collectors, accent: '#16a34a' },
   ];
+
+  const formatCompactNumber = (value) => {
+    const number = Number(value) || 0;
+    return new Intl.NumberFormat('en', {
+      notation: 'compact',
+      compactDisplay: 'short',
+      maximumFractionDigits: 1,
+    }).format(number);
+  };
+
 
   const fetchArtworks = useCallback(async () => {
     try {
@@ -77,18 +91,23 @@ const Home = () => {
   }, [fetchArtworks]);
 
   useEffect(() => {
-    const fetchArtists = async () => {
+    const fetchHomeStats = async () => {
       try {
-        const res = await artistAPI.getAll({ limit: 6 });
-        if (res.data && res.data.data) {
-          setFeaturedArtists(res.data.data);
+        const res = await buyerAPI.getHomeStats();
+        if (res.data?.success && res.data?.stats) {
+          setHomeStats({
+            curated_artworks: res.data.stats.curated_artworks || 0,
+            verified_artists: res.data.stats.verified_artists || 0,
+            monthly_collectors: res.data.stats.monthly_collectors || 0,
+            countries_count: res.data.stats.countries_count || 0,
+          });
         }
       } catch (err) {
-        console.error('Failed to fetch artists:', err);
+        console.error('Failed to fetch home stats:', err);
       }
     };
 
-    fetchArtists();
+    fetchHomeStats();
   }, []);
 
   const handleWishlistToggle = async (artwork) => {
@@ -222,28 +241,37 @@ const Home = () => {
             />
           </Box>
 
-          <Grid container spacing={2} sx={{ mt: { xs: 3, md: 4 } }}>
+          <Grid container spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: { xs: 3, md: 4 } }}>
             {statHighlights.map((item) => (
-              <Grid item xs={12} sm={4} key={item.label}>
+              <Grid item xs={4} sm={4} key={item.label}>
                 <Box
                   sx={{
-                    p: 2.5,
-                    borderRadius: 3,
+                    width: { xs: 96, sm: '100%' },
+                    height: { xs: 96, sm: 'auto' },
+                    mx: 'auto',
+                    p: { xs: 1.25, sm: 2.5 },
+                    borderRadius: { xs: '50%', sm: 3 },
                     backgroundColor: 'rgba(255,255,255,0.08)',
                     border: '1px solid rgba(255,255,255,0.1)',
-                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: { xs: 'center', sm: 'flex-start' },
+                    textAlign: { xs: 'center', sm: 'left' },
+                    gap: { xs: 0.3, sm: 0.75 },
                   }}
                 >
-                  <Typography variant="h4" fontWeight={800} sx={{ color: item.accent }}>
-                    {item.value}
+                  <Typography variant="h4" fontWeight={800} sx={{ color: item.accent, fontSize: { xs: '1.4rem', sm: '2rem' }, lineHeight: 1 }}>
+                    {formatCompactNumber(item.value)}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                  <Typography variant="body2" sx={{ opacity: 0.85, fontSize: { xs: '0.62rem', sm: '0.875rem' }, lineHeight: 1.2 }}>
                     {item.label}
                   </Typography>
                 </Box>
               </Grid>
             ))}
           </Grid>
+
         </Box>
       </Box>
 
@@ -296,15 +324,14 @@ const Home = () => {
         </Box>
       </Box>
 
+
       {/* Filters */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 4, backgroundColor: 'white', p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2, border: '1px solid rgba(15,23,42,0.06)' }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <FilterList />
           <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Category</InputLabel>
             <Select
               value={category}
-              label="Category"
               onChange={(e) => setCategory(e.target.value)}
             >
               <MenuItem value="all">All Categories</MenuItem>
@@ -336,13 +363,14 @@ const Home = () => {
         ) : (
           filteredArtworks.map((artwork) => (
             <Grid item xs={6} sm={6} md={3} key={artwork.id}>
-              <Card sx={{ 
+              <Card sx={{
                 position: 'relative',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                '&:hover': { 
+                borderRadius: { xs: 2.5, sm: 3 },
+                '&:hover': {
                   transform: 'translateY(-8px)',
                   boxShadow: 6,
                 }
@@ -351,9 +379,10 @@ const Home = () => {
                 <IconButton
                   sx={{ 
                     position: 'absolute', 
-                    top: 8, 
-                    right: 8, 
+                    top: { xs: 6, sm: 8 }, 
+                    right: { xs: 6, sm: 8 }, 
                     backgroundColor: 'white',
+                    p: { xs: 0.75, sm: 1 },
                     '&:hover': { backgroundColor: 'white' }
                   }}
                   onClick={() => handleWishlistToggle(artwork)}
@@ -366,42 +395,55 @@ const Home = () => {
                 </IconButton>
 
                 {(() => {
-                  const fallbackImage = 'https://images.unsplash.com/photo-1528901166007-3784c7dd3653?auto=format&fit=crop&w=900&q=80';
-                  const imageSrc = (artwork.image_url || artwork.imageUrl || artwork.image || '').trim() || fallbackImage;
+                  const imageSrc = (artwork.image_url || artwork.imageUrl || artwork.image || '').trim();
                   return (
                     <Box
                       sx={{
-                        height: { xs: 160, sm: 200 },
+                        height: { xs: 135, sm: 200 },
                         overflow: 'hidden',
                         backgroundColor: '#f5f5f5',
                         cursor: 'pointer'
                       }}
                       onClick={() => window.location.href = `/artwork/${artwork.id}`}
                     >
-                      <img
-                        src={imageSrc}
-                        alt={artwork.title}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          display: 'block'
-                        }}
-                        onError={(e) => {
-                          console.error('Image failed to load:', { src: imageSrc, artwork });
-                          e.target.onerror = null;
-                          e.target.src = fallbackImage;
-                        }}
-                        onLoad={() => console.log('Image loaded successfully:', { title: artwork.title, src: imageSrc })}
-                      />
+                      {imageSrc ? (
+                        <img
+                          src={imageSrc}
+                          alt={artwork.title}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'text.secondary',
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                          }}
+                        >
+                          No Image
+                        </Box>
+                      )}
                     </Box>
                   );
                 })()}
                 
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" component="h3" gutterBottom noWrap>
+                <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+                  <Typography variant="h6" component="h3" gutterBottom noWrap sx={{ fontSize: { xs: '1.05rem', sm: '1.25rem' }, mb: { xs: 0.4, sm: 1 } }}>
                     {artwork.title}
                   </Typography>
                   
@@ -413,44 +455,46 @@ const Home = () => {
                     sx={{ 
                       textDecoration: 'none',
                       display: 'block',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
                       maxWidth: '100%',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      mb: { xs: 0.25, sm: 0.5 },
                       '&:hover': { textDecoration: 'underline' }
                     }}
                   >
                     {artwork.artist_first_name} {artwork.artist_last_name}
                   </Typography>
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                    <Typography variant="h6" color="primary">
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: { xs: 0.5, sm: 1 } }}>
+                    <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>
                       ${artwork.price ? artwork.price.toLocaleString() : 'N/A'}
                     </Typography>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Star sx={{ color: '#FFD700', fontSize: 16 }} />
-                      <Typography variant="body2">
+                      <Star sx={{ color: '#FFD700', fontSize: { xs: 14, sm: 16 } }} />
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.9rem', sm: '0.875rem' } }}>
                         {artwork.rating || 'N/A'}
                       </Typography>
                     </Box>
                   </Box>
                   
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: { xs: 0.5, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' } }} noWrap>
                     {artwork.medium || 'N/A'} {artwork.year ? `• ${artwork.year}` : ''}
                   </Typography>
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: { xs: 1, sm: 2 } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Visibility sx={{ fontSize: 16 }} />
-                      <Typography variant="body2">
+                      <Visibility sx={{ fontSize: { xs: 14, sm: 16 } }} />
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                         {artwork.view_count || 0}
                       </Typography>
                     </Box>
                     
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Favorite sx={{ fontSize: 16, color: 'error.main' }} />
-                      <Typography variant="body2">
+                      <Favorite sx={{ fontSize: { xs: 14, sm: 16 }, color: 'error.main' }} />
+                      <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                         {artwork.likes || 0}
                       </Typography>
                     </Box>
@@ -459,7 +503,7 @@ const Home = () => {
                   <Button
                     fullWidth
                     variant="contained"
-                    sx={{ mt: 2 }}
+                    sx={{ mt: { xs: 1.25, sm: 2 }, py: { xs: 0.8, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}
                     onClick={() => handleAddToCart(artwork)}
                   >
                     Add to Cart
@@ -473,131 +517,73 @@ const Home = () => {
 
       {/* Featured Artists Section */}
       <Box sx={{ mb: 8 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ mb: 4 }}>
           <Typography variant="h4" component="h2">
             Featured Artists
           </Typography>
-          <Button 
+        </Box>
+        
+        <Box sx={{ textAlign: 'center', py: { xs: 2, md: 3 } }}>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+            Artist profiles are available on the dedicated artists page.
+          </Typography>
+          <Button
+            variant="contained"
             component={Link}
             to="/artists"
             endIcon={<ArrowForward />}
           >
-            View All Artists
+            See Artist Profiles
           </Button>
         </Box>
-        
-        <Grid container spacing={4}>
-          {featuredArtists.map((artist) => (
-            <Grid item xs={12} md={4} key={artist.id}>
-              <Card sx={{ textAlign: 'center', p: 3 }}>
-                <Box
-                  component="img"
-                  src={artist.avatar}
-                  alt={artist.name}
-                  sx={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    margin: '0 auto 16px',
-                    border: '4px solid',
-                    borderColor: 'primary.main',
-                  }}
-                />
-                
-                <Typography variant="h6" gutterBottom>
-                  {artist.name}
-                </Typography>
-                
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {artist.title}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, my: 2 }}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" color="primary">
-                      {artist.artworksCount}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Artworks
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" color="primary">
-                      {artist.followers}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Followers
-                    </Typography>
-                  </Box>
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 2 }}>
-                  <Star sx={{ color: '#FFD700', fontSize: 16 }} />
-                  <Typography variant="body2">
-                    {artist.rating}
-                  </Typography>
-                </Box>
-                
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  component={Link}
-                  to={`/artists/${artist.id}`}
-                >
-                  View Profile
-                </Button>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
       </Box>
 
       {/* Stats Section */}
-      <Box sx={{ 
-        backgroundColor: 'primary.light',
-        color: 'white',
-        py: 6,
-        borderRadius: 4,
-        mb: 8,
-        textAlign: 'center'
-      }}>
+      <Box
+        sx={{
+          backgroundColor: 'primary.light',
+          color: 'white',
+          py: 6,
+          borderRadius: 4,
+          mb: 8,
+          textAlign: 'center'
+        }}
+      >
         <Typography variant="h4" component="h2" gutterBottom>
           Join Our Growing Community
         </Typography>
-        
+
         <Grid container spacing={4} sx={{ mt: 2 }}>
           <Grid item xs={6} md={3}>
             <Typography variant="h3" component="div" gutterBottom>
-              10,000+
+              {formatCompactNumber(homeStats.curated_artworks)}
             </Typography>
             <Typography variant="body1">
               Artworks
             </Typography>
           </Grid>
-          
+
           <Grid item xs={6} md={3}>
             <Typography variant="h3" component="div" gutterBottom>
-              500+
+              {formatCompactNumber(homeStats.verified_artists)}
             </Typography>
             <Typography variant="body1">
               Artists
             </Typography>
           </Grid>
-          
+
           <Grid item xs={6} md={3}>
             <Typography variant="h3" component="div" gutterBottom>
-              5,000+
+              {formatCompactNumber(homeStats.monthly_collectors)}
             </Typography>
             <Typography variant="body1">
               Collectors
             </Typography>
           </Grid>
-          
+
           <Grid item xs={6} md={3}>
             <Typography variant="h3" component="div" gutterBottom>
-              50+
+              {formatCompactNumber(homeStats.countries_count)}
             </Typography>
             <Typography variant="body1">
               Countries
@@ -605,6 +591,7 @@ const Home = () => {
           </Grid>
         </Grid>
       </Box>
+
     </Container>
   );
 };

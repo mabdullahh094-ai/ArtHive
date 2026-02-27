@@ -66,6 +66,8 @@ const emailService = {
                 <p><span class="label">Artist ID:</span> <span class="value">${artistData.id}</span></p>
                 ${artistData.bio ? `<p><span class="label">Bio:</span> <span class="value">${artistData.bio}</span></p>` : ''}
                 ${artistData.specialization ? `<p><span class="label">Specialization:</span> <span class="value">${artistData.specialization}</span></p>` : ''}
+                ${artistData.phone_number ? `<p><span class="label">Phone:</span> <span class="value">${artistData.phone_number}</span></p>` : ''}
+                ${artistData.address ? `<p><span class="label">Address:</span> <span class="value">${artistData.address}</span></p>` : ''}
                 ${artistData.website_url ? `<p><span class="label">Website:</span> <span class="value">${artistData.website_url}</span></p>` : ''}
                 ${artistData.certificate_url ? `<p><span class="label">Certificate:</span> <span class="value">Uploaded</span></p>` : ''}
                 <p><span class="label">Verification Status:</span> <span class="value">${artistData.verification_status || 'pending'}</span></p>
@@ -128,6 +130,8 @@ Email: ${artistData.email}
 Artist ID: ${artistData.id}
 ${artistData.bio ? `Bio: ${artistData.bio}` : ''}
 ${artistData.specialization ? `Specialization: ${artistData.specialization}` : ''}
+${artistData.phone_number ? `Phone: ${artistData.phone_number}` : ''}
+${artistData.address ? `Address: ${artistData.address}` : ''}
 ${artistData.website_url ? `Website: ${artistData.website_url}` : ''}
 ${artistData.certificate_url ? `Certificate: Uploaded` : ''}
 Verification Status: ${artistData.verification_status || 'pending'}

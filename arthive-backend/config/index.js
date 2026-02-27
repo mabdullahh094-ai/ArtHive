@@ -1,6 +1,21 @@
 ﻿const dotenv = require('dotenv');
 dotenv.config();
 
+const parseOrigins = () => {
+  const fromEnv = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const fallbackOrigins = [
+    process.env.CLIENT_URL,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ].filter(Boolean);
+
+  return [...new Set([...fromEnv, ...fallbackOrigins])];
+};
+
 module.exports = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -16,6 +31,6 @@ module.exports = {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: parseOrigins(),
   },
 };

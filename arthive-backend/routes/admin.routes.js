@@ -17,6 +17,7 @@ router.put("/artworks/:id", adminController.updateArtworkStatus);
 
 // Artist approval routes
 router.get("/artists", adminController.getPendingArtists);
+router.get("/artists/:id/profile", adminController.getArtistProfileDetails);
 router.put("/artists/:id", adminController.updateArtistStatus);
 
 // Buyer management routes

@@ -3,23 +3,20 @@ import {
   Box,
   Button,
   Card,
-  CardActions,
   CardContent,
   CardMedia,
-  Chip,
   CircularProgress,
   Container,
   FormControl,
   Grid,
   IconButton,
-  InputLabel,
   MenuItem,
   Pagination,
   Select,
   TextField,
   Typography,
 } from '@mui/material';
-import { Favorite, FavoriteBorder, Search, ShoppingCart } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, Search } from '@mui/icons-material';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -156,22 +153,46 @@ const ArtworkGallery = () => {
 
   return (
     <Container maxWidth="lg">
-      <Box sx={{ mb: 4, mt: 4 }} component="form" onSubmit={handleSearchSubmit}>
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+      <Box sx={{ mb: 4, mt: { xs: 2, sm: 4 } }} component="form" onSubmit={handleSearchSubmit}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'stretch',
+            gap: { xs: 1, sm: 1.5 },
+            mb: 3,
+          }}
+        >
           <TextField
             fullWidth
             placeholder="Search artworks or artists..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              flex: '1 1 0',
+              minWidth: 0,
+              '& .MuiInputBase-root': {
+                height: { xs: 42, sm: 48 },
+                fontSize: { xs: '0.95rem', sm: '1rem' },
+              },
+            }}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
             }}
           />
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Category</InputLabel>
+          <FormControl
+            sx={{
+              flex: { xs: '0 0 36%', sm: '0 0 210px' },
+              minWidth: { xs: 110, sm: 160 },
+              '& .MuiInputBase-root': {
+                height: { xs: 42, sm: 48 },
+                fontSize: { xs: '0.95rem', sm: '1rem' },
+              },
+            }}
+          >
             <Select
               value={filter}
-              label="Category"
+              displayEmpty
               onChange={(e) => handleFilterChange(e.target.value)}
             >
               {CATEGORY_OPTIONS.map((option) => (
@@ -181,9 +202,6 @@ const ArtworkGallery = () => {
               ))}
             </Select>
           </FormControl>
-          <Button variant="contained" type="submit" sx={{ px: 3 }}>
-            Search
-          </Button>
         </Box>
         {(searchParam || categoryParam !== 'all') && (
           <Typography variant="body2" color="text.secondary">
@@ -204,7 +222,7 @@ const ArtworkGallery = () => {
           </Typography>
         </Box>
       ) : (
-        <Grid container spacing={4}>
+        <Grid container spacing={{ xs: 2, md: 4 }}>
           {artworks.map((artwork) => {
             const isWishlisted = wishlistItems.some(
               (item) => item.artworkId === artwork.id || item.id === artwork.id
@@ -213,24 +231,55 @@ const ArtworkGallery = () => {
             const artistName = artwork.artist_first_name
               ? `${artwork.artist_first_name} ${artwork.artist_last_name}`
               : artwork.artistName || 'Unknown Artist';
-            const categoryLabel = artwork.category_name || artwork.category || 'Uncategorized';
             const mediumLabel = artwork.medium || artwork.medium_type || 'N/A';
             const image = artwork.image_url || artwork.imageUrl || 'https://via.placeholder.com/400x300?text=No+Image';
 
             return (
-              <Grid item xs={12} sm={6} md={4} key={artwork.id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Grid item xs={6} sm={6} md={3} key={artwork.id}>
+                <Card
+                  sx={{
+                    position: 'relative',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    borderRadius: { xs: 2.5, sm: 3 },
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: 6,
+                    },
+                  }}
+                >
+                  <IconButton
+                    sx={{
+                      position: 'absolute',
+                      top: { xs: 6, sm: 8 },
+                      right: { xs: 6, sm: 8 },
+                      backgroundColor: 'white',
+                      p: { xs: 0.75, sm: 1 },
+                      zIndex: 1,
+                      '&:hover': { backgroundColor: 'white' },
+                    }}
+                    onClick={() => handleWishlistClick(artwork)}
+                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                  >
+                    {isWishlisted ? <Favorite color="error" /> : <FavoriteBorder />}
+                  </IconButton>
+
                   <Link to={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
                     <CardMedia
                       component="img"
-                      height="250"
                       image={image}
                       alt={artwork.title}
-                      sx={{ objectFit: 'cover', backgroundColor: '#f5f5f5' }}
+                      sx={{
+                        height: { xs: 135, sm: 200 },
+                        objectFit: 'cover',
+                        backgroundColor: '#f5f5f5',
+                      }}
                       onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=No+Image'; }}
                     />
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography gutterBottom variant="h6" noWrap>
+                    <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
+                      <Typography gutterBottom variant="h6" noWrap sx={{ fontSize: { xs: '1.05rem', sm: '1.25rem' }, mb: { xs: 0.4, sm: 1 } }}>
                         {artwork.title}
                       </Typography>
                       <Typography
@@ -238,37 +287,29 @@ const ArtworkGallery = () => {
                         color="text.secondary"
                         noWrap
                         title={artistName}
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                       >
                         By {artistName}
                       </Typography>
-                      <Box sx={{ mt: 1, mb: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Chip label={categoryLabel} size="small" sx={{ mr: 1 }} />
-                        <Chip label={mediumLabel} size="small" variant="outlined" />
-                      </Box>
-                      <Typography variant="h6" color="primary">
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: { xs: 0.5, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' } }} noWrap>
+                        {mediumLabel}
+                      </Typography>
+                      <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>
                         ${artwork.price ? artwork.price.toLocaleString() : 'N/A'}
                       </Typography>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        sx={{ mt: { xs: 1.25, sm: 2 }, py: { xs: 0.8, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleAddToCart(artwork);
+                        }}
+                      >
+                        Add to Cart
+                      </Button>
                     </CardContent>
                   </Link>
-                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                    <IconButton
-                      size="small"
-                      sx={{ mr: 1 }}
-                      onClick={() => handleWishlistClick(artwork)}
-                      aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-                    >
-                      {isWishlisted ? <Favorite color="error" /> : <FavoriteBorder />}
-                    </IconButton>
-                    <Button
-                      size="small"
-                      color="primary"
-                      variant="contained"
-                      startIcon={<ShoppingCart />}
-                      onClick={() => handleAddToCart(artwork)}
-                    >
-                      Add to Cart
-                    </Button>
-                  </CardActions>
                 </Card>
               </Grid>
             );

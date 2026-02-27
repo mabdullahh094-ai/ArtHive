@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import {
   Box,
   Container,
   Typography,
@@ -18,7 +18,7 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
-import { 
+import {
   Link as RouterLink,
 } from 'react-router-dom';
 import {
@@ -136,7 +136,7 @@ const Footer = () => {
         sx={{
           backgroundColor: theme.palette.grey[900],
           color: theme.palette.grey[300],
-          py: { xs: 4, md: 6 },
+          py: { xs: 3, md: 6 },
           borderTop: `1px solid ${theme.palette.divider}`,
           position: 'relative',
         }}
@@ -147,24 +147,30 @@ const Footer = () => {
             sx={{
               backgroundColor: alpha(theme.palette.primary.main, 0.1),
               borderRadius: 2,
-              p: { xs: 3, md: 4 },
-              mb: 6,
+              p: { xs: 2, md: 4 },
+              mb: { xs: 4, md: 6 },
               border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}
           >
-            <Grid container alignItems="center" spacing={4}>
+            <Grid container alignItems="center" spacing={{ xs: 2, md: 4 }}>
               <Grid item xs={12} md={6}>
-                <Typography variant="h5" gutterBottom color="white" fontWeight="bold">
+                <Typography
+                  variant="h5"
+                  gutterBottom
+                  color="white"
+                  fontWeight="bold"
+                  sx={{ fontSize: { xs: '1.2rem', md: '1.5rem' }, mb: { xs: 1, md: 1.5 } }}
+                >
                   Stay Inspired
                 </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                <Typography variant="body1" sx={{ opacity: 0.9, fontSize: { xs: '0.9rem', md: '1rem' }, lineHeight: { xs: 1.4, md: 1.6 } }}>
                   Subscribe to our newsletter for exclusive artwork previews, artist interviews, 
                   and special offers delivered to your inbox.
                 </Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <form onSubmit={handleNewsletterSubmit}>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <TextField
                       fullWidth
                       type="email"
@@ -200,14 +206,16 @@ const Footer = () => {
                       disabled={submitting}
                       startIcon={<Send />}
                       sx={{
-                        minWidth: 120,
+                        minWidth: { xs: 100, md: 120 },
+                        px: { xs: 1.25, md: 2 },
+                        fontSize: { xs: '0.78rem', md: '0.875rem' },
                         whiteSpace: 'nowrap',
                       }}
                     >
                       {submitting ? 'Subscribing...' : 'Subscribe'}
                     </Button>
                   </Box>
-                  <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.7 }}>
+                  <Typography variant="caption" sx={{ mt: 0.75, display: 'block', opacity: 0.7, fontSize: { xs: '0.68rem', md: '0.75rem' } }}>
                     By subscribing, you agree to our Privacy Policy. Unsubscribe at any time.
                   </Typography>
                 </form>
@@ -220,10 +228,10 @@ const Footer = () => {
             {/* Dynamic Sections - FIXED SECTION */}
             {footerSections.map((section) => (
               <Grid item xs={6} sm={3} key={section.title}>
-                <Typography 
-                  variant="h6" 
-                  gutterBottom 
-                  sx={{ 
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{
                     color: 'white',
                     fontSize: '1.1rem',
                     mb: 2,

@@ -36,6 +36,11 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS artists (
         id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         bio TEXT,
+        city VARCHAR(100),
+        country VARCHAR(100),
+        contact_email VARCHAR(255),
+        address TEXT,
+        phone_number VARCHAR(30),
         website_url VARCHAR(255),
         social_media JSONB,
         verification_status VARCHAR(50) DEFAULT 'pending',

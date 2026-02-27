@@ -129,6 +129,55 @@ const adminController = {
     }
   },
 
+  // Get full artist profile details for admin review
+  getArtistProfileDetails: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const artistResult = await db.query(
+        `SELECT
+           a.*,
+           u.email,
+           u.first_name,
+           u.last_name,
+           u.profile_pic_url,
+           u.created_at as signup_date
+         FROM artists a
+         JOIN users u ON a.id = u.id
+         WHERE a.id = $1`,
+        [id]
+      );
+
+      if (artistResult.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Artist not found'
+        });
+      }
+
+      const artworksResult = await db.query(
+        `SELECT id, title, description, image_url, price, status, created_at
+         FROM artworks
+         WHERE artist_id = $1
+         ORDER BY created_at DESC
+         LIMIT 50`,
+        [id]
+      );
+
+      res.json({
+        success: true,
+        artist: artistResult.rows[0],
+        artworks: artworksResult.rows
+      });
+    } catch (error) {
+      console.error('Get artist profile details error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch artist profile details'
+      });
+    }
+  },
+
   // Approve or reject an artist
   updateArtistStatus: async (req, res) => {
     try {
@@ -141,6 +190,23 @@ const adminController = {
           success: false,
           message: "verification_status must be 'verified' or 'rejected'"
         });
+      }
+
+      if (verification_status === 'verified') {
+        const artworkCountResult = await db.query(
+          `SELECT COUNT(*)::int AS submitted_artworks
+           FROM artworks
+           WHERE artist_id = $1`,
+          [id]
+        );
+
+        const submittedArtworks = artworkCountResult.rows[0]?.submitted_artworks || 0;
+        if (submittedArtworks < 4) {
+          return res.status(400).json({
+            success: false,
+            message: 'Artist must submit at least 4 artworks before approval'
+          });
+        }
       }
 
       // Update artist verification status

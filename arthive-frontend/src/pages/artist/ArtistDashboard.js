@@ -145,16 +145,21 @@ const ArtistDashboard = () => {
               <Grid container spacing={2}>
                 {artworks.map((artwork) => (
                   <Grid item xs={12} sm={6} md={4} key={artwork.id}>
-                    <Card>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                       {artwork.image_url && (
                         <CardMedia
                           component="img"
-                          height="200"
+                          height="220"
                           image={artwork.image_url}
                           alt={artwork.title}
+                          sx={{
+                            height: 220,
+                            objectFit: 'cover',
+                            backgroundColor: '#f5f5f5',
+                          }}
                         />
                       )}
-                      <CardContent>
+                      <CardContent sx={{ flexGrow: 1 }}>
                         <Typography variant="subtitle1" gutterBottom>
                           {artwork.title}
                         </Typography>

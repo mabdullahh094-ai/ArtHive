@@ -39,6 +39,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { artistAPI } from '../../services/api';
 
 const ArtistDetail = () => {
   const { id } = useParams();
@@ -54,170 +55,86 @@ const ArtistDetail = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchArtistDetails();
-    fetchArtistArtworks();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const fetchArtistDetails = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Replace with actual API call
-      // const response = await artistAPI.getById(id);
-      
-      // Mock data
-      const mockArtist = {
-        id: parseInt(id),
-        name: 'Sarah Chen',
-        title: 'Abstract Expressionist',
-        bio: 'Contemporary artist exploring abstract forms and colors. Sarah\'s work focuses on the intersection of dreams and reality through vibrant color palettes and fluid forms.',
-        fullBio: 'Sarah Chen is a contemporary abstract expressionist based in New York City. With over 15 years of experience, her work has been exhibited in galleries worldwide. She holds an MFA from the School of Visual Arts and has been featured in numerous art publications.',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&auto=format&fit=crop',
-        coverImage: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=1200&auto=format&fit=crop',
-        location: 'New York, USA',
-        yearsActive: '15 years',
-        artworksCount: 42,
-        followers: 1240,
-        rating: 4.9,
-        socialLinks: {
-          website: 'https://sarahchen.art',
-          instagram: 'https://instagram.com/sarahchenart',
-          facebook: 'https://facebook.com/sarahchenart',
-          twitter: 'https://twitter.com/sarahchenart',
-        },
-        contact: {
-          email: 'sarah@chenart.com',
-          phone: '+1 (555) 123-4567',
-        },
-        education: [
-          {
-            institution: 'School of Visual Arts',
-            degree: 'MFA in Painting',
-            year: '2010',
-          },
-          {
-            institution: 'Pratt Institute',
-            degree: 'BFA in Fine Arts',
-            year: '2006',
-          },
-        ],
-        exhibitions: [
-          {
-            title: 'Abstract Realities',
-            gallery: 'Modern Art Gallery NYC',
-            year: '2023',
-          },
-          {
-            title: 'Color and Form',
-            gallery: 'International Art Fair Miami',
-            year: '2022',
-          },
-        ],
-        awards: [
-          'Young Artist Award 2022',
-          'Contemporary Art Prize 2021',
-        ],
-        categories: ['Abstract', 'Contemporary', 'Mixed Media'],
-      };
-      
-      setArtist(mockArtist);
-    } catch (err) {
-      setError('Failed to load artist details');
-      console.error('Error fetching artist:', err);
-      notification.showError('Failed to load artist details');
-    } finally {
-      setLoading(false);
-    }
-  };
+        const [artistRes, artworksRes] = await Promise.all([
+          artistAPI.getById(id),
+          artistAPI.getArtworks(id, { page: 1, limit: 50 }),
+        ]);
 
-  const fetchArtistArtworks = async () => {
-    try {
-      // Replace with actual API call
-      // const response = await artistAPI.getArtworks(id);
-      
-      // Mock data
-      const mockArtworks = [
-        {
-          id: 1,
-          title: 'Abstract Dreams',
-          artist: 'Sarah Chen',
-          artistId: parseInt(id),
-          price: 1200,
-          image: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&auto=format&fit=crop',
-          category: 'painting',
-          medium: 'Oil on canvas',
-          year: 2023,
-          dimensions: '24" x 36"',
-          description: 'A vibrant abstract piece exploring dreams and reality.',
-          stock: 5,
-          views: 1420,
-          likes: 256,
-          rating: 4.8,
-          tags: ['abstract', 'colorful', 'modern'],
-        },
-        {
-          id: 2,
-          title: 'Morning Light',
-          artist: 'Sarah Chen',
-          artistId: parseInt(id),
-          price: 950,
-          image: 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800&auto=format&fit=crop',
-          category: 'painting',
-          medium: 'Acrylic on wood',
-          year: 2023,
-          dimensions: '20" x 30"',
-          description: 'Soft morning light through abstract forms.',
-          stock: 3,
-          views: 890,
-          likes: 145,
-          rating: 4.5,
-          tags: ['abstract', 'light', 'soft'],
-        },
-        {
-          id: 3,
-          title: 'Urban Echoes',
-          artist: 'Sarah Chen',
-          artistId: parseInt(id),
-          price: 1800,
-          image: 'https://images.unsplash.com/photo-1543857778-c4a1a569e388?w=800&auto=format&fit=crop',
-          category: 'mixed media',
-          medium: 'Acrylic and collage',
-          year: 2022,
-          dimensions: '36" x 48"',
-          description: 'Cityscape abstract with mixed media elements.',
-          stock: 2,
-          views: 1120,
-          likes: 198,
-          rating: 4.7,
-          tags: ['urban', 'abstract', 'mixed-media'],
-        },
-        {
-          id: 4,
-          title: 'Color Burst',
-          artist: 'Sarah Chen',
-          artistId: parseInt(id),
-          price: 750,
-          image: 'https://images.unsplash.com/photo-1515405295579-ba7b45403062?w=800&auto=format&fit=crop',
-          category: 'painting',
-          medium: 'Watercolor and ink',
-          year: 2023,
-          dimensions: '16" x 20"',
-          description: 'Explosion of colors in abstract form.',
-          stock: 8,
-          views: 760,
-          likes: 112,
-          rating: 4.4,
-          tags: ['colorful', 'abstract', 'watercolor'],
-        },
-      ];
-      
-      setArtworks(mockArtworks);
-    } catch (err) {
-      console.error('Error fetching artworks:', err);
-    }
-  };
+        const artistData = artistRes?.data?.artist;
+        const artworksData = artworksRes?.data?.artworks || [];
+
+        if (!artistData) {
+          setError('Artist not found');
+          setArtist(null);
+          setArtworks([]);
+          return;
+        }
+
+        const socialMedia = artistData.social_media || {};
+        const displayArtist = {
+          id: artistData.id,
+          name: `${artistData.first_name || ''} ${artistData.last_name || ''}`.trim(),
+          title: artistData.specialization || '',
+          bio: artistData.bio || 'No biography available.',
+          fullBio: artistData.bio || 'No biography available.',
+          avatar: artistData.profile_pic_url || '',
+          coverImage: artworksData[0]?.image_url || '',
+          location: [artistData.city, artistData.country].filter(Boolean).join(', '),
+          yearsActive: '',
+          artworksCount: Number(artistData.total_artworks || artworksData.length || 0),
+          followers: 0,
+          rating: 'N/A',
+          socialLinks: {
+            website: artistData.website_url || socialMedia.website || '',
+            instagram: socialMedia.instagram || '',
+            facebook: socialMedia.facebook || '',
+            twitter: socialMedia.twitter || '',
+          },
+          contact: {
+            email: artistData.contact_email || artistData.email || '',
+            phone: artistData.phone_number || '',
+          },
+          education: [],
+          exhibitions: [],
+          awards: [],
+          categories: artistData.specialization ? [artistData.specialization] : [],
+        };
+
+        const mappedArtworks = artworksData.map((item) => ({
+          id: item.id,
+          title: item.title,
+          artist: displayArtist.name,
+          artistId: item.artist_id,
+          price: Number(item.price || 0),
+          image: item.image_url,
+          category: item.category_name || '',
+          medium: item.medium || 'N/A',
+          year: item.created_at ? new Date(item.created_at).getFullYear() : '',
+          dimensions: item.dimensions || '',
+          description: item.description || '',
+        }));
+
+        setArtist(displayArtist);
+        setArtworks(mappedArtworks);
+      } catch (err) {
+        const message = err?.response?.data?.message || 'Failed to load artist details';
+        setError(message);
+        setArtist(null);
+        setArtworks([]);
+        console.error('Error fetching artist details:', err);
+        notification.showError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id, notification]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -283,22 +200,14 @@ const ArtistDetail = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Back Button */}
-      <Button
-        startIcon={<ArrowBack />}
-        onClick={() => navigate(-1)}
-        sx={{ mb: 3 }}
-      >
-        Back
-      </Button>
-
       {/* Artist Header */}
       <Paper elevation={0} sx={{ mb: 4, borderRadius: 2, overflow: 'hidden' }}>
         {/* Cover Image */}
         <Box
           sx={{
             height: 200,
-            backgroundImage: `url(${artist.coverImage})`,
+            backgroundImage: artist.coverImage ? `url(${artist.coverImage})` : 'none',
+            backgroundColor: artist.coverImage ? 'transparent' : 'rgba(15,23,42,0.08)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
@@ -467,19 +376,33 @@ const ArtistDetail = () => {
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
+                    borderRadius: 2,
                     transition: 'transform 0.2s',
                     '&:hover': { transform: 'translateY(-4px)' }
                   }}
                 >
-                  <CardMedia
-                    component="img"
-                    height="200"
-                    image={artwork.image}
-                    alt={artwork.title}
-                    sx={{ cursor: 'pointer' }}
+                  <Box
+                    sx={{
+                      height: 220,
+                      backgroundColor: '#f5f5f5',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                    }}
                     onClick={() => navigate(`/artwork/${artwork.id}`)}
-                  />
-                  <CardContent sx={{ flexGrow: 1 }}>
+                  >
+                    <CardMedia
+                      component="img"
+                      image={artwork.image}
+                      alt={artwork.title}
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  </Box>
+                  <CardContent sx={{ flexGrow: 1, minHeight: 165, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <Typography 
                       variant="h6" 
                       noWrap
@@ -501,7 +424,7 @@ const ArtistDetail = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                       <Typography variant="h6" color="primary">
-                        ${artwork.price.toLocaleString()}
+                        ${(Number(artwork.price) || 0).toLocaleString()}
                       </Typography>
                       <Button
                         size="small"

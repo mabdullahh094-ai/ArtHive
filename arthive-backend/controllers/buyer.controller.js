@@ -134,6 +134,161 @@ const buyerController = {
     }
   },
 
+  // Public: get single artist details by ID
+  getPublicArtistById: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const result = await db.query(
+        `SELECT
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            u.profile_pic_url,
+            u.created_at,
+            a.bio,
+            a.city,
+            a.country,
+            a.contact_email,
+            a.phone_number,
+            a.website_url,
+            a.social_media,
+            a.specialization,
+            a.verification_status,
+            a.total_artworks,
+            a.total_sales
+         FROM users u
+         JOIN artists a ON u.id = a.id
+         WHERE u.id = $1
+           AND u.user_type = 'artist'
+           AND u.status = 'active'
+           AND a.verification_status = 'verified'`,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Artist not found',
+        });
+      }
+
+      const artist = result.rows[0];
+      if (artist.social_media && typeof artist.social_media === 'string') {
+        try {
+          artist.social_media = JSON.parse(artist.social_media);
+        } catch (e) {
+          artist.social_media = {};
+        }
+      }
+
+      res.json({
+        success: true,
+        artist,
+      });
+    } catch (error) {
+      console.error('Error in getPublicArtistById:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch artist details',
+      });
+    }
+  },
+
+  // Public: get approved artworks for a single artist
+  getPublicArtistArtworks: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { page = 1, limit = 24 } = req.query;
+      const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+      const result = await db.query(
+        `SELECT
+            a.id,
+            a.artist_id,
+            a.title,
+            a.description,
+            a.price,
+            a.image_url,
+            a.medium,
+            a.dimensions,
+            a.created_at,
+            COUNT(*) OVER() as total_count
+         FROM artworks a
+         WHERE a.artist_id = $1
+           AND a.status = 'approved'
+         ORDER BY a.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [id, parseInt(limit, 10), offset]
+      );
+
+      res.json({
+        success: true,
+        artworks: result.rows,
+        pagination: {
+          page: parseInt(page, 10),
+          limit: parseInt(limit, 10),
+          total: result.rows[0]?.total_count || 0,
+          totalPages: Math.ceil((result.rows[0]?.total_count || 0) / parseInt(limit, 10)),
+        },
+      });
+    } catch (error) {
+      console.error('Error in getPublicArtistArtworks:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch artist artworks',
+      });
+    }
+  },
+
+  // Public: homepage stat highlights
+  getHomeStats: async (req, res) => {
+    try {
+      const artworkStats = await db.query(
+        `SELECT COUNT(*)::int as curated_artworks
+         FROM artworks
+         WHERE status = 'approved'`
+      );
+
+      const artistStats = await db.query(
+        `SELECT COUNT(*)::int as verified_artists
+         FROM artists
+         WHERE verification_status = 'verified'`
+      );
+
+      const collectorStats = await db.query(
+        `SELECT COUNT(*)::int as monthly_collectors
+         FROM users
+         WHERE user_type = 'buyer'`
+      );
+
+      const countryStats = await db.query(
+        `SELECT COUNT(DISTINCT TRIM(country))::int as countries_count
+         FROM artists
+         WHERE verification_status = 'verified'
+           AND country IS NOT NULL
+           AND TRIM(country) <> ''`
+      );
+
+      res.json({
+        success: true,
+        stats: {
+          curated_artworks: artworkStats.rows[0]?.curated_artworks || 0,
+          verified_artists: artistStats.rows[0]?.verified_artists || 0,
+          monthly_collectors: collectorStats.rows[0]?.monthly_collectors || 0,
+          countries_count: countryStats.rows[0]?.countries_count || 0,
+        },
+      });
+    } catch (error) {
+      console.error('Error in getHomeStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch home stats',
+      });
+    }
+  },
+
   // Get all artworks with pagination and filters
   getArtworks: async (req, res) => {
     try {
