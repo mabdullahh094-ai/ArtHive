@@ -165,12 +165,12 @@ jobs:
           echo ""
           echo "📦 Installing frontend dependencies..."
           cd "$DEPLOY_DIR/arthive-frontend"
-          npm install --omit=dev --prefer-offline --silent
+          npm install --prefer-offline --silent
           echo "✅ Frontend dependencies installed"
 
           echo ""
           echo "🔨 Building frontend..."
-          npm run build --silent 2>&1 | grep -E "(error|warning|✓)" || true
+          npm run build
           echo "✅ Frontend built successfully"
           cd "$DEPLOY_DIR"
 
