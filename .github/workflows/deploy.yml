@@ -41,6 +41,21 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Sync code to server
+        run: |
+          echo "📥 Syncing latest code to server via rsync..."
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude 'arthive-backend/node_modules' \
+            --exclude 'arthive-frontend/node_modules' \
+            --exclude 'arthive-backend/uploads' \
+            --exclude 'models' \
+            --exclude '.env' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_DIR }}/
+          echo "✅ Code synced successfully"
+
       - name: Deploy application
         run: |
           ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'DEPLOY_SCRIPT'
@@ -56,17 +71,6 @@ jobs:
 
           # Navigate to deployment directory
           cd $DEPLOY_DIR || { echo "❌ Deploy directory not found"; exit 1; }
-
-          # Update repository
-          echo "📥 Pulling latest code from GitHub..."
-          if [ -d ".git" ]; then
-            git fetch origin main --quiet
-            git reset --hard origin/main --quiet
-            git clean -fd --quiet
-            echo "✅ Code updated"
-          else
-            echo "⚠️  .git directory not found - skipping git update"
-          fi
 
           # Verify .env files exist
           echo ""
@@ -183,9 +187,6 @@ jobs:
             # Copy to sites-available and link to sites-enabled (Ubuntu default)
             sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
             sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
-            
-            # Also copy to conf.d just in case Nginx is configured to only read from there
-            sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/conf.d/arthive.conf
           fi
           
           echo "🔍 Verifying loaded Nginx configuration:"

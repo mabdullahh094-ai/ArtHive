@@ -26,9 +26,9 @@ def resolve_model_path():
     if env_model_dir:
         return os.path.join(env_model_dir, 'best_model.pt')
 
-    # Fallback to repository-level models directory.
+    # Fallback to repository-level Scrapping/models directory.
     repo_root = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
-    return os.path.join(repo_root, 'models', 'image_price_regressor_feedback_v2', 'best_model.pt')
+    return os.path.join(repo_root, 'Scrapping', 'models', 'image_price_regressor_feedback_v2', 'best_model.pt')
 
 MODEL_PATH = resolve_model_path()
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
