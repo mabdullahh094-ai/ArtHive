@@ -174,13 +174,23 @@ jobs:
           # Install Nginx reverse proxy config
           echo ""
           echo "🌐 Updating Nginx reverse proxy configuration..."
-          # Remove default Nginx site to prevent conflicts
+          # Aggressively remove all default Nginx sites to prevent conflicts
           sudo rm -f /etc/nginx/sites-enabled/default
+          sudo rm -f /etc/nginx/sites-enabled/default.conf
+          sudo rm -f /etc/nginx/conf.d/default.conf
           
           if [ -f "$DEPLOY_DIR/deploy/nginx/arthive.conf" ]; then
+            # Copy to sites-available and link to sites-enabled (Ubuntu default)
             sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
+            sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
+            
+            # Also copy to conf.d just in case Nginx is configured to only read from there
+            sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/conf.d/arthive.conf
           fi
-          sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
+          
+          echo "🔍 Verifying loaded Nginx configuration:"
+          sudo nginx -T 2>/dev/null | grep -i "server_name" || true
+          
           sudo nginx -t
           echo "✅ Nginx config installed"
 
