@@ -68,10 +68,12 @@ Result: You should see order confirmation page.
 
 ## 🔐 Your Stripe Keys
 
-**Secret Key** (Backend only - Already configured):
+**Secret Key** (Backend only - Already configured in `.env`):
 ```
-STRIPE_SECRET_KEY: sk_test_REDACTED_SECRET_KEY
+STRIPE_SECRET_KEY: sk_test_YOUR_SECRET_KEY_HERE
 ```
+
+> Store actual keys in `.env` file, never in documentation
 
 **Public Key** (Frontend - Get from Stripe Dashboard):
 1. Go to https://dashboard.stripe.com

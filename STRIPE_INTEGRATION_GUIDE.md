@@ -24,8 +24,10 @@ This will create:
 ### Step 3: Verify .env Configuration
 Your `.env` file already has:
 ```env
-STRIPE_SECRET_KEY=sk_test_REDACTED_SECRET_KEY
+STRIPE_SECRET_KEY=sk_test_YOUR_SECRET_KEY_HERE
 ```
+
+> **Note:** Your actual Stripe secret key is stored in `.env` (never commit real keys to git)
 
 ✅ **No additional backend setup needed!**
 
