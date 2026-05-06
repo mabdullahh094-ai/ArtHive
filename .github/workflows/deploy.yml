@@ -41,6 +41,16 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Build Frontend
+        env:
+          REACT_APP_API_URL: http://${{ env.DEPLOY_HOST }}:3001/api
+        run: |
+          echo "🔨 Building frontend on GitHub Actions runner..."
+          cd arthive-frontend
+          npm install
+          npm run build
+          echo "✅ Frontend built successfully"
+
       - name: Sync code to server
         run: |
           echo "📥 Syncing latest code to server via rsync..."
@@ -164,16 +174,8 @@ jobs:
 
           # Install and build frontend
           echo ""
-          echo "📦 Installing frontend dependencies..."
-          cd "$DEPLOY_DIR/arthive-frontend"
-          npm install --prefer-offline --silent
-          echo "✅ Frontend dependencies installed"
-
-          echo ""
-          echo "🔨 Building frontend..."
-          npm run build
-          echo "✅ Frontend built successfully"
-          cd "$DEPLOY_DIR"
+          echo "📦 Frontend is already built by GitHub Actions runner!"
+          echo "✅ Skipping frontend build on server"
 
           # Install Nginx reverse proxy config
           echo ""
