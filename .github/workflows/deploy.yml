@@ -73,16 +73,16 @@ jobs:
             echo "Expected one of: SSH_KEY or SSH_PRIVATE_KEY" >&2
             exit 1
           fi
-          printf "%s" "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.deploy_key"
-          chmod 600 "$GITHUB_WORKSPACE/.deploy_key"
 
       # ── 4. SCP tarball to server ───────────────────────────────────────────
       - name: Upload tarball to server
         uses: appleboy/scp-action@v0.1.7
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
         with:
           host: ${{ env.DEPLOY_HOST }}
           username: ${{ env.DEPLOY_USER }}
-          key_path: /github/workspace/.deploy_key
+          key: ${{ env.SSH_PRIVATE_KEY }}
           port: 22
           source: "arthive-deploy.tar.gz"
           target: "/tmp/"
@@ -90,10 +90,12 @@ jobs:
       # ── 5. Remote deployment ───────────────────────────────────────────────
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
         with:
           host: ${{ env.DEPLOY_HOST }}
           username: ${{ env.DEPLOY_USER }}
-          key_path: /github/workspace/.deploy_key
+          key: ${{ env.SSH_PRIVATE_KEY }}
           port: 22
           # Give large uploads time to finish building
           command_timeout: "20m"
@@ -157,6 +159,3 @@ jobs:
             echo "✅  Deployment complete!"
             echo "    Site: https://art-hive.tech"
 
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -f "$GITHUB_WORKSPACE/.deploy_key"
