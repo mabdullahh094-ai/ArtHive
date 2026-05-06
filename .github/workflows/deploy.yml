@@ -156,6 +156,16 @@ jobs:
           echo "✅ Frontend built successfully"
           cd "$DEPLOY_DIR"
 
+          # Install Nginx reverse proxy config
+          echo ""
+          echo "🌐 Updating Nginx reverse proxy configuration..."
+          if [ -f "$DEPLOY_DIR/deploy/nginx/arthive.conf" ]; then
+            sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
+          fi
+          sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
+          sudo nginx -t
+          echo "✅ Nginx config installed"
+
           # Setup systemd service for backend
           echo ""
           echo "⚙️  Setting up systemd service for backend..."
