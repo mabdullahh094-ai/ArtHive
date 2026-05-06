@@ -149,31 +149,30 @@ jobs:
           # Setup systemd service for backend
           echo ""
           echo "⚙️  Setting up systemd service for backend..."
-          
-          cat > /tmp/arthive-backend.service << 'SERVICEEOF'
-[Unit]
-Description=ArtHive Backend Service
-After=network.target postgresql.service
 
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/var/www/arthive/arthive-backend
-Environment="NODE_ENV=production"
-Environment="PORT=3001"
-EnvironmentFile=/var/www/arthive/arthive-backend/.env
-ExecStart=/usr/bin/node /var/www/arthive/arthive-backend/server.js
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=arthive-backend
+          cat <<'SERVICEEOF' | sed 's/^          //' | sudo tee /etc/systemd/system/arthive-backend.service > /dev/null
+          [Unit]
+          Description=ArtHive Backend Service
+          After=network.target postgresql.service
 
-[Install]
-WantedBy=multi-user.target
-SERVICEEOF
+          [Service]
+          Type=simple
+          User=ubuntu
+          WorkingDirectory=/var/www/arthive/arthive-backend
+          Environment="NODE_ENV=production"
+          Environment="PORT=3001"
+          EnvironmentFile=/var/www/arthive/arthive-backend/.env
+          ExecStart=/usr/bin/node /var/www/arthive/arthive-backend/server.js
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=arthive-backend
 
-          sudo mv /tmp/arthive-backend.service /etc/systemd/system/arthive-backend.service
+          [Install]
+          WantedBy=multi-user.target
+          SERVICEEOF
+
           sudo systemctl daemon-reload
           echo "✅ Backend systemd service configured"
 
