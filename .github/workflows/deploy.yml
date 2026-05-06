@@ -65,12 +65,15 @@ jobs:
 
       # ── 3b. Setup SSH key ────────────────────────────────────────────────────
       - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
         run: |
-          if [ -z "${{ secrets.SSH_KEY }}" ]; then
-            echo "ERROR: SSH_KEY secret is empty or missing." >&2
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "ERROR: SSH key secret is empty or missing." >&2
+            echo "Expected one of: SSH_KEY or SSH_PRIVATE_KEY" >&2
             exit 1
           fi
-          printf "%s" "${{ secrets.SSH_KEY }}" > "$GITHUB_WORKSPACE/.deploy_key"
+          printf "%s" "$SSH_PRIVATE_KEY" > "$GITHUB_WORKSPACE/.deploy_key"
           chmod 600 "$GITHUB_WORKSPACE/.deploy_key"
 
       # ── 4. SCP tarball to server ───────────────────────────────────────────
