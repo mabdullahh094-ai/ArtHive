@@ -50,7 +50,6 @@ jobs:
             --exclude 'arthive-backend/node_modules' \
             --exclude 'arthive-frontend/node_modules' \
             --exclude 'arthive-backend/uploads' \
-            --exclude 'models' \
             --exclude '.env' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_DIR }}/
@@ -89,12 +88,12 @@ jobs:
             echo "✅ Frontend .env found"
           fi
 
-          # Verify model file exists
+          # Verify ML model
           echo ""
           echo "🤖 Verifying ML model..."
-          if [ ! -f "models/image_price_regressor_feedback_v2/best_model.pt" ]; then
-            echo "⚠️  WARNING: ML model not found at models/image_price_regressor_feedback_v2/best_model.pt"
-            echo "Price prediction features may not work until model is uploaded"
+          if [ ! -f "$DEPLOY_DIR/Scrapping/models/image_price_regressor_feedback_v2/best_model.pt" ]; then
+            echo "⚠️  ML model not found at $DEPLOY_DIR/Scrapping/models/image_price_regressor_feedback_v2/best_model.pt"
+            echo "Price prediction features may not work correctly."
           else
             echo "✅ ML model found"
           fi
@@ -225,12 +224,12 @@ jobs:
           sudo systemctl daemon-reload
           echo "✅ Backend systemd service configured"
 
-          # Start backend service
+          # Restart backend service
           echo ""
-          echo "🚀 Starting backend service..."
-          sudo systemctl start arthive-backend
+          echo "🚀 Restarting backend service..."
+          sudo systemctl restart arthive-backend
           sudo systemctl enable arthive-backend --quiet 2>/dev/null || true
-          echo "✅ Backend service started and enabled on boot"
+          echo "✅ Backend service restarted and enabled on boot"
 
           # Wait for backend to initialize
           echo ""
