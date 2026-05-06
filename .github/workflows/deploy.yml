@@ -126,8 +126,18 @@ jobs:
             # Clean pip cache to save disk space
             pip3 cache purge 2>/dev/null || true
             # Use --no-cache-dir to prevent pip from caching packages during download
-            pip3 install --no-cache-dir -q -r ml_models/requirements.txt --break-system-packages 2>&1 | grep -v "already satisfied" || true
-            echo "✅ Python dependencies installed"
+            if python_install_output=$(pip3 install --no-cache-dir -q -r ml_models/requirements.txt --break-system-packages 2>&1); then
+              echo "$python_install_output" | grep -v "already satisfied" || true
+              echo "✅ Python dependencies installed"
+            else
+              echo "$python_install_output" | grep -v "already satisfied" || true
+              if echo "$python_install_output" | grep -qi "Disk quota exceeded"; then
+                echo "⚠️  Python dependencies could not be fully installed due to disk quota limits"
+                echo "⚠️  ML features may be unavailable until more space/quota is available"
+              else
+                echo "⚠️  Python dependencies installation failed"
+              fi
+            fi
           else
             echo "⚠️  ml_models/requirements.txt not found"
           fi
