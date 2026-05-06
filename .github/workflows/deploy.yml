@@ -156,6 +156,7 @@ jobs:
             
             # Clean up temp dir
             rm -rf "$TMPDIR"
+            unset TMPDIR
           else
             echo "⚠️  ml_models/requirements.txt not found"
           fi
