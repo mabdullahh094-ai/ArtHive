@@ -58,7 +58,7 @@ async function seedDatabase() {
     // 3. Create test artist
     console.log('\n🎨 Creating test artist...');
     const testArtistEmail = 'testartist@art-hive.tech';
-    const artistCheck = await pool.query('SELECT id FROM users WHERE email = $1', [testArtistEmail]);
+    const artistCheck = await pool.query('SELECT u.id FROM users u LEFT JOIN artists a ON u.id = a.id WHERE u.email = $1', [testArtistEmail]);
     
     let artistUserId;
     if (artistCheck.rows.length === 0) {
@@ -70,13 +70,24 @@ async function seedDatabase() {
       artistUserId = artistUserResult.rows[0].id;
 
       await pool.query(
-        'INSERT INTO artists (id, bio, city, country, verification_status, created_at) VALUES ($1, $2, $3, $4, $5, NOW())',
+        'INSERT INTO artists (id, bio, city, country, verification_status) VALUES ($1, $2, $3, $4, $5)',
         [artistUserId, 'Test artist for demo purposes', 'Test City', 'Test Country', 'verified']
       );
-      console.log('   ✅ Test artist created (Email: testartist@art-hive.tech)');
+      console.log('   ✅ Test artist created (Email: testartist@art-hive.tech, Password: TestArtist@123)');
     } else {
       artistUserId = artistCheck.rows[0].id;
-      console.log('   ℹ️  Test artist already exists');
+      
+      // Verify artist profile exists
+      const artistProfileCheck = await pool.query('SELECT id FROM artists WHERE id = $1', [artistUserId]);
+      if (artistProfileCheck.rows.length === 0) {
+        await pool.query(
+          'INSERT INTO artists (id, bio, city, country, verification_status) VALUES ($1, $2, $3, $4, $5)',
+          [artistUserId, 'Test artist for demo purposes', 'Test City', 'Test Country', 'verified']
+        );
+        console.log('   ✅ Test artist profile created');
+      } else {
+        console.log('   ℹ️  Test artist already exists');
+      }
     }
 
     // 4. Create sample artworks

@@ -123,21 +123,36 @@ jobs:
           echo ""
           echo "🐍 Installing Python ML dependencies..."
           if [ -f "ml_models/requirements.txt" ]; then
+            # Check disk space and inodes before installation
+            echo "📊 Disk space before installation:"
+            df -h .
+            echo "📊 Inodes before installation:"
+            df -i .
+
             # Clean pip cache to save disk space
             pip3 cache purge 2>/dev/null || true
+            
             # Use --no-cache-dir to prevent pip from caching packages during download
-            if python_install_output=$(pip3 install --no-cache-dir -q -r ml_models/requirements.txt --break-system-packages 2>&1); then
+            # Use --extra-index-url for CPU-only torch to significantly reduce install size
+            # Use TMPDIR to avoid filling up the /tmp partition
+            export TMPDIR="$DEPLOY_DIR/pip_tmp"
+            mkdir -p "$TMPDIR"
+            
+            if python_install_output=$(pip3 install --no-cache-dir -q -r ml_models/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu --break-system-packages 2>&1); then
               echo "$python_install_output" | grep -v "already satisfied" || true
               echo "✅ Python dependencies installed"
             else
               echo "$python_install_output" | grep -v "already satisfied" || true
               if echo "$python_install_output" | grep -qi "Disk quota exceeded"; then
                 echo "⚠️  Python dependencies could not be fully installed due to disk quota limits"
-                echo "⚠️  ML features may be unavailable until more space/quota is available"
+                echo "⚠️  Try increasing your disk size or checking user quotas with 'quota -vs'"
               else
                 echo "⚠️  Python dependencies installation failed"
               fi
             fi
+            
+            # Clean up temp dir
+            rm -rf "$TMPDIR"
           else
             echo "⚠️  ml_models/requirements.txt not found"
           fi
