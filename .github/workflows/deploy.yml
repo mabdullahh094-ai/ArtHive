@@ -13,6 +13,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: 51.21.111.113
+      DEPLOY_USER: ubuntu
 
     steps:
       # ── 1. Checkout ────────────────────────────────────────────────────────
@@ -60,8 +63,8 @@ jobs:
       - name: Upload tarball to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
           source: "arthive-deploy.tar.gz"
@@ -71,8 +74,8 @@ jobs:
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
           # Give large uploads time to finish building
@@ -105,10 +108,25 @@ jobs:
             # /var/www/arthive/models/image_price_regressor_feedback_v2/best_model.pt
             mkdir -p "$DEPLOY_DIR/models/image_price_regressor_feedback_v2"
 
+            echo "==> Validating model file"
+            MODEL_FILE="$DEPLOY_DIR/models/image_price_regressor_feedback_v2/best_model.pt"
+            if [ ! -f "$MODEL_FILE" ]; then
+              echo "ERROR: Model file missing at $MODEL_FILE" >&2
+              echo "Place your trained model there before deploying." >&2
+              exit 1
+            fi
+            echo "Model found: $MODEL_FILE"
+
             echo "==> Restarting Docker services"
             cd "$DEPLOY_DIR"
             docker compose down --remove-orphans || true
             docker compose up -d --build
+
+            echo "==> Verifying backend model environment"
+            if ! grep -q '^MODEL_DIR=/models/image_price_regressor_feedback_v2$' "$DEPLOY_DIR/arthive-backend/.env"; then
+              echo "WARNING: MODEL_DIR is missing or different in arthive-backend/.env" >&2
+              echo "Expected: MODEL_DIR=/models/image_price_regressor_feedback_v2" >&2
+            fi
 
             echo "==> Configuring nginx"
             sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
