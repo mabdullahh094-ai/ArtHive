@@ -18,7 +18,11 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY ml_models/requirements.txt ./ml_models/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r ml_models/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch torchvision \
+    && grep -viE '^(torch|torchvision)\s*$' ml_models/requirements.txt > /tmp/requirements-no-torch.txt \
+    && pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements-no-torch.txt
 
 COPY . .
 
