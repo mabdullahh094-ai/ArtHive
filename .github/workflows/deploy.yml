@@ -273,14 +273,14 @@ jobs:
             BACKEND_STATUS="FAILED"
           fi
 
-          # Check frontend
+          # Check frontend (via Nginx)
           echo ""
-          echo "Checking Frontend..."
-          if ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} 'systemctl is-active --quiet arthive-frontend'; then
-            echo "  ✅ Frontend service is running"
-            FRONTEND_STATUS="RUNNING"
+          echo "Checking Frontend (Nginx)..."
+          if ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} 'systemctl is-active --quiet nginx'; then
+            echo "  ✅ Nginx is running (serving frontend)"
+            FRONTEND_STATUS="RUNNING (via Nginx)"
           else
-            echo "  ❌ Frontend service is NOT running"
+            echo "  ❌ Nginx is NOT running"
             FRONTEND_STATUS="FAILED"
           fi
 
