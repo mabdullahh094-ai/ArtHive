@@ -146,11 +146,11 @@ jobs:
           echo "✅ Frontend built successfully"
           cd "$DEPLOY_DIR"
 
-          # Setup systemd service for backend only
+          # Setup systemd service for backend
           echo ""
           echo "⚙️  Setting up systemd service for backend..."
           
-          sudo tee /etc/systemd/system/arthive-backend.service > /dev/null <<'SERVICE'
+          cat > /tmp/arthive-backend.service << 'SERVICEEOF'
 [Unit]
 Description=ArtHive Backend Service
 After=network.target postgresql.service
@@ -171,8 +171,9 @@ SyslogIdentifier=arthive-backend
 
 [Install]
 WantedBy=multi-user.target
-SERVICE
+SERVICEEOF
 
+          sudo mv /tmp/arthive-backend.service /etc/systemd/system/arthive-backend.service
           sudo systemctl daemon-reload
           echo "✅ Backend systemd service configured"
 
@@ -183,7 +184,7 @@ SERVICE
           sudo systemctl enable arthive-backend --quiet 2>/dev/null || true
           echo "✅ Backend service started and enabled on boot"
 
-          # Wait for services to be ready
+          # Wait for backend to initialize
           echo ""
           echo "⏳ Waiting for backend to initialize..."
           sleep 5
