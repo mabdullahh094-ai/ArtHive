@@ -180,13 +180,12 @@ SERVICE
           echo ""
           echo "🚀 Starting backend service..."
           sudo systemctl start arthive-backend
-          sudo systemctl start arthive-frontend
-          sudo systemctl enable arthive-backend arthive-frontend --quiet 2>/dev/null || true
-          echo "✅ Services started and enabled on boot"
+          sudo systemctl enable arthive-backend --quiet 2>/dev/null || true
+          echo "✅ Backend service started and enabled on boot"
 
           # Wait for services to be ready
           echo ""
-          echo "⏳ Waiting for services to initialize..."
+          echo "⏳ Waiting for backend to initialize..."
           sleep 5
 
           # Check service status
@@ -198,12 +197,6 @@ SERVICE
             echo "  ❌ Backend (port 3001): FAILED"
           fi
 
-          if sudo systemctl is-active --quiet arthive-frontend; then
-            echo "  ✅ Frontend (port 3000): RUNNING"
-          else
-            echo "  ❌ Frontend (port 3000): FAILED"
-          fi
-
           # Check Nginx
           echo ""
           echo "🌐 Checking Nginx..."
@@ -212,6 +205,7 @@ SERVICE
             # Verify Nginx config
             if sudo nginx -t 2>&1 | grep -q "successful"; then
               echo "  ✅ Nginx config: VALID"
+              echo "  ℹ️  Frontend served from: /var/www/arthive/arthive-frontend/build"
               # Reload Nginx to apply any changes
               sudo systemctl reload nginx
               echo "  ✅ Nginx reloaded"
@@ -220,7 +214,7 @@ SERVICE
               sudo nginx -t
             fi
           else
-            echo "  ⚠️  Nginx: NOT RUNNING (frontend may not be accessible via reverse proxy)"
+            echo "  ⚠️  Nginx: NOT RUNNING (frontend may not be accessible)"
           fi
 
           echo ""
