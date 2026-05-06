@@ -1,0 +1,20 @@
+[Unit]
+Description=ArtHive Frontend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/arthive/arthive-frontend
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+EnvironmentFile=/var/www/arthive/arthive-frontend/.env
+ExecStart=/usr/bin/node /var/www/arthive/arthive-frontend/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arthive-frontend
+
+[Install]
+WantedBy=multi-user.target

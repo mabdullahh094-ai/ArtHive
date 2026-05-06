@@ -123,8 +123,10 @@ jobs:
           echo ""
           echo "🐍 Installing Python ML dependencies..."
           if [ -f "ml_models/requirements.txt" ]; then
-            # Use --break-system-packages (safe on dedicated deployment server)
-            pip3 install -q -r ml_models/requirements.txt --break-system-packages 2>&1 | grep -v "already satisfied" || true
+            # Clean pip cache to save disk space
+            pip3 cache purge 2>/dev/null || true
+            # Use --no-cache-dir to prevent pip from caching packages during download
+            pip3 install --no-cache-dir -q -r ml_models/requirements.txt --break-system-packages 2>&1 | grep -v "already satisfied" || true
             echo "✅ Python dependencies installed"
           else
             echo "⚠️  ml_models/requirements.txt not found"
@@ -144,9 +146,39 @@ jobs:
           echo "✅ Frontend built successfully"
           cd "$DEPLOY_DIR"
 
-          # Start services
+          # Setup systemd service for backend only
           echo ""
-          echo "🚀 Starting services..."
+          echo "⚙️  Setting up systemd service for backend..."
+          
+          sudo tee /etc/systemd/system/arthive-backend.service > /dev/null <<'SERVICE'
+[Unit]
+Description=ArtHive Backend Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/arthive/arthive-backend
+Environment="NODE_ENV=production"
+Environment="PORT=3001"
+EnvironmentFile=/var/www/arthive/arthive-backend/.env
+ExecStart=/usr/bin/node /var/www/arthive/arthive-backend/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=arthive-backend
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+          sudo systemctl daemon-reload
+          echo "✅ Backend systemd service configured"
+
+          # Start backend service
+          echo ""
+          echo "🚀 Starting backend service..."
           sudo systemctl start arthive-backend
           sudo systemctl start arthive-frontend
           sudo systemctl enable arthive-backend arthive-frontend --quiet 2>/dev/null || true
