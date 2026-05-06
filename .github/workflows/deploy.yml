@@ -50,12 +50,13 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.venv' \
+            --exclude='*.tar.gz' \
+            --exclude='*.pem' \
             --exclude='arthive-frontend/node_modules' \
             --exclude='arthive-backend/node_modules' \
             --exclude='arthive-backend/venv' \
             --exclude='arthive-backend/.venv' \
-            --exclude='arthive-backend/arthive-deploy.tar.gz' \
-            --exclude='*.pem' \
+            --ignore-failed-read \
             -czf arthive-deploy.tar.gz .
           echo "Tarball size: $(du -sh arthive-deploy.tar.gz | cut -f1)"
 
