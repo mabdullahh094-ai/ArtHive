@@ -123,8 +123,13 @@ jobs:
           echo ""
           echo "🐍 Installing Python ML dependencies..."
           if [ -f "ml_models/requirements.txt" ]; then
-            pip3 install -q -r ml_models/requirements.txt --break-system-packages 2>/dev/null || pip3 install -q -r ml_models/requirements.txt
-            echo "✅ Python dependencies installed"
+            # Create virtual environment for Python packages
+            python3 -m venv venv
+            source venv/bin/activate
+            pip3 install -q --upgrade pip
+            pip3 install -q -r ml_models/requirements.txt
+            deactivate
+            echo "✅ Python dependencies installed in virtual environment"
           else
             echo "⚠️  ml_models/requirements.txt not found"
           fi
