@@ -149,6 +149,13 @@ export const CartProvider = ({ children }) => {
 
   // Add item to cart (accepts artwork id or artwork object)
   const addToCart = async (artworkOrId, quantity = 1) => {
+    if (!isAuthenticated || !["buyer", "user"].includes(user?.user_type)) {
+      return {
+        success: false,
+        error: 'Only buyers can add items to cart',
+      };
+    }
+
     const artworkId = typeof artworkOrId === 'object' ? (artworkOrId.id || artworkOrId.artworkId) : artworkOrId;
     const artworkData = typeof artworkOrId === 'object' ? artworkOrId : null;
 

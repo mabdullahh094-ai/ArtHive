@@ -9,11 +9,74 @@ const ensureArtistPortfolioColumns = async () => {
   `);
 };
 
+const ensureArtworkGalleryColumn = async () => {
+  await db.query(`
+    ALTER TABLE artworks
+    ADD COLUMN IF NOT EXISTS image_urls JSONB
+  `);
+};
+
+const ensureArtworkSubmissionSourceColumn = async () => {
+  await db.query(`
+    ALTER TABLE artworks
+    ADD COLUMN IF NOT EXISTS submission_source VARCHAR(32) DEFAULT 'dashboard'
+  `);
+};
+
+const syncArtistArtworkCount = async (artistId) => {
+  await db.query(
+    `UPDATE artists
+     SET total_artworks = (
+       SELECT COUNT(*)::int FROM artworks WHERE artist_id = $1
+     )
+     WHERE id = $1`,
+    [artistId]
+  );
+};
+
+const ensureArtistRecord = async (artistId) => {
+  const userResult = await db.query(
+    `SELECT id FROM users WHERE id = $1 AND user_type = 'artist'`,
+    [artistId]
+  );
+
+  if (userResult.rows.length === 0) {
+    return false;
+  }
+
+  await db.query(
+    `INSERT INTO artists (
+      id,
+      bio,
+      website_url,
+      social_media,
+      verification_status,
+      total_artworks,
+      total_sales
+    )
+    VALUES ($1, '', '', '{}'::jsonb, 'pending', 0, 0)
+    ON CONFLICT (id) DO NOTHING`,
+    [artistId]
+  );
+
+  return true;
+};
+
 const artistController = {
   // Create new artwork
   createArtwork: async (req, res) => {
     try {
       const artistId = req.user.id;
+
+      const artistRecordReady = await ensureArtistRecord(artistId);
+      if (!artistRecordReady) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Artist only."
+        });
+      }
+
+      await ensureArtworkSubmissionSourceColumn();
       
       const {
         title,
@@ -37,7 +100,7 @@ const artistController = {
 
       // Verify artist exists
       const artistCheck = await db.query(
-        "SELECT id FROM artists WHERE id = $1",
+        "SELECT id, verification_status FROM artists WHERE id = $1",
         [artistId]
       );
 
@@ -48,13 +111,15 @@ const artistController = {
         });
       }
 
+      const artworkStatus = artistCheck.rows[0].verification_status === 'verified' ? 'approved' : 'pending';
+
       // Create artwork
       const newArtwork = await db.query(
         `INSERT INTO artworks (
           artist_id, title, description, category_id, medium,
           dimensions, price, image_url, ai_authenticity_score,
-          ai_price_recommendation, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ai_price_recommendation, status, submission_source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *`,
         [
           artistId,
@@ -67,19 +132,17 @@ const artistController = {
           image_url,
           ai_authenticity_score || null,
           ai_price_recommendation || null,
-          'pending'
+          artworkStatus,
+          'dashboard'
         ]
       );
 
-      // Update artist's total artworks count
-      await db.query(
-        "UPDATE artists SET total_artworks = total_artworks + 1 WHERE id = $1",
-        [artistId]
-      );
+      // Keep denormalized count in sync with real artworks table.
+      await syncArtistArtworkCount(artistId);
 
       res.status(201).json({
         success: true,
-        message: "Artwork created successfully",
+        message: artworkStatus === 'approved' ? "Artwork created and published successfully" : "Artwork created successfully",
         artwork: newArtwork.rows[0]
       });
 
@@ -239,11 +302,8 @@ const artistController = {
         [id, artistId]
       );
 
-      // Update artist's total artworks count
-      await db.query(
-        "UPDATE artists SET total_artworks = GREATEST(total_artworks - 1, 0) WHERE id = $1",
-        [artistId]
-      );
+      // Keep denormalized count in sync with real artworks table.
+      await syncArtistArtworkCount(artistId);
 
       res.json({
         success: true,
@@ -340,6 +400,63 @@ const artistController = {
     }
   },
 
+  // Get sold paintings for the current artist
+  getSoldPaintings: async (req, res) => {
+    try {
+      const artistId = req.user.id;
+      const { page = 1, limit = 12 } = req.query;
+      const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+      const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 12, 1), 50);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const soldItemsResult = await db.query(
+        `SELECT
+           oi.id,
+           oi.order_id,
+           o.order_number,
+           o.order_date,
+           a.id as artwork_id,
+           a.title,
+           a.image_url,
+           oi.quantity,
+           oi.price_at_purchase,
+           (oi.quantity * oi.price_at_purchase) as line_revenue,
+           u.first_name as buyer_first_name,
+           u.last_name as buyer_last_name,
+           COUNT(*) OVER() as total_count
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN artworks a ON a.id = oi.artwork_id
+         JOIN users u ON u.id = o.buyer_id
+         WHERE a.artist_id = $1
+           AND o.status = 'completed'
+           AND COALESCE(o.payment_status, 'paid') = 'paid'
+         ORDER BY o.order_date DESC NULLS LAST, oi.id DESC
+         LIMIT $2 OFFSET $3`,
+        [artistId, parsedLimit, offset]
+      );
+
+      const total = parseInt(soldItemsResult.rows[0]?.total_count || 0, 10);
+
+      return res.json({
+        success: true,
+        sold_paintings: soldItemsResult.rows,
+        pagination: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total,
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+      });
+    } catch (error) {
+      console.error('Get sold paintings error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch sold paintings',
+      });
+    }
+  },
+
   // Update order status (for artist)
   updateOrderStatus: async (req, res) => {
     try {
@@ -431,16 +548,62 @@ const artistController = {
         [artistId]
       );
 
-      // Get orders stats
+      // Get orders stats (artist specific)
       const ordersStats = await db.query(
-        `SELECT 
-           COUNT(*) as total_orders,
-           SUM(CASE WHEN status = 'completed' AND payment_status = 'paid' THEN total_amount ELSE 0 END) as total_revenue,
-           SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
-           SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing_orders,
-           SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_orders
-         FROM orders
-         WHERE artist_id = $1`,
+        `SELECT
+           (SELECT COUNT(DISTINCT o.id)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1) as total_orders,
+           (SELECT COALESCE(SUM(oi.price_at_purchase * oi.quantity), 0)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'completed'
+              AND COALESCE(o.payment_status, 'paid') = 'paid') as total_revenue,
+           (SELECT COUNT(DISTINCT o.id)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'pending') as pending_orders,
+           (SELECT COUNT(DISTINCT o.id)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'processing') as processing_orders,
+           (SELECT COUNT(DISTINCT o.id)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'completed') as completed_orders,
+           (SELECT COALESCE(SUM(oi.quantity), 0)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'completed'
+              AND COALESCE(o.payment_status, 'paid') = 'paid') as paintings_sold,
+           (SELECT COALESCE(SUM(oi.price_at_purchase * oi.quantity), 0)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'completed'
+              AND COALESCE(o.payment_status, 'paid') = 'paid'
+              AND DATE_TRUNC('month', o.order_date) = DATE_TRUNC('month', CURRENT_DATE)) as monthly_revenue,
+           (SELECT COALESCE(SUM(oi.quantity), 0)
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN artworks a ON oi.artwork_id = a.id
+            WHERE a.artist_id = $1
+              AND o.status = 'completed'
+              AND COALESCE(o.payment_status, 'paid') = 'paid'
+              AND DATE_TRUNC('month', o.order_date) = DATE_TRUNC('month', CURRENT_DATE)) as monthly_paintings_sold`,
         [artistId]
       );
 
@@ -465,12 +628,40 @@ const artistController = {
         [artistId]
       );
 
+      // Get recent sold artworks for this artist
+      const recentSoldArtworks = await db.query(
+        `SELECT
+           oi.id,
+           oi.order_id,
+           o.order_number,
+           o.order_date,
+           a.id as artwork_id,
+           a.title,
+           a.image_url,
+           oi.quantity,
+           oi.price_at_purchase,
+           (oi.quantity * oi.price_at_purchase) as line_revenue,
+           u.first_name as buyer_first_name,
+           u.last_name as buyer_last_name
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN artworks a ON a.id = oi.artwork_id
+         JOIN users u ON u.id = o.buyer_id
+         WHERE a.artist_id = $1
+           AND o.status = 'completed'
+           AND COALESCE(o.payment_status, 'paid') = 'paid'
+         ORDER BY o.order_date DESC NULLS LAST, oi.id DESC
+         LIMIT 10`,
+        [artistId]
+      );
+
       const stats = {
         artist: artistInfo.rows[0],
         artworks: artworksStats.rows[0],
         orders: ordersStats.rows[0],
         recent_orders: recentOrders.rows,
-        popular_artworks: popularArtworks.rows
+        popular_artworks: popularArtworks.rows,
+        recent_sold_artworks: recentSoldArtworks.rows
       };
 
       // Parse JSON fields
@@ -502,52 +693,87 @@ const artistController = {
     try {
       const artistId = req.user.id;
 
+      const artistRecordReady = await ensureArtistRecord(artistId);
+      if (!artistRecordReady) {
+        return res.status(403).json({ success: false, message: 'Access denied. Artist only.' });
+      }
+
       await ensureArtistPortfolioColumns();
+      await ensureArtworkGalleryColumn();
+  await ensureArtworkSubmissionSourceColumn();
 
       // Ensure files were provided
       const images = (req.files && req.files.images) || [];
       const certificate = (req.files && req.files.certificate && req.files.certificate[0]) || null;
-      const { specialization } = req.body;
-
-      if (!Array.isArray(images) || images.length < 4) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please upload at least 4 portfolio images.'
-        });
-      }
+      const { specialization, submission_context } = req.body;
+      const submissionSource = submission_context === 'dashboard' ? 'dashboard' : 'portfolio_review';
 
       // Ensure artist exists
-      const artistCheck = await db.query('SELECT id FROM artists WHERE id = $1', [artistId]);
+      const artistCheck = await db.query('SELECT id, verification_status FROM artists WHERE id = $1', [artistId]);
       if (artistCheck.rows.length === 0) {
         return res.status(403).json({ success: false, message: 'Artist profile not found' });
       }
 
-      // Create artworks for each uploaded image with status='pending'
+      const isVerifiedArtist = artistCheck.rows[0].verification_status === 'verified';
+      const minImagesRequired = 1;
+
+      if (!Array.isArray(images) || images.length < minImagesRequired) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please upload at least 1 artwork image.'
+        });
+      }
+
+      const artworkStatus = isVerifiedArtist ? 'approved' : 'pending';
+
       const createdArtworks = [];
-      for (const file of images) {
-        const imageUrl = `/uploads/artist_portfolio/${file.filename}`;
+      const { title, description, category_id, medium, dimensions, price } = req.body;
+
+      const trimmedTitle = title && String(title).trim()
+        ? String(title).trim()
+        : `Artwork ${new Date().toISOString().slice(0, 10)}`;
+
+      const parsedPrice = Number.isNaN(parseFloat(price)) ? 0 : parseFloat(price);
+      if (parsedPrice < 0) {
+        return res.status(400).json({ success: false, message: 'Artwork price cannot be negative.' });
+      }
+
+      const imageUrls = images.map((file) => `/uploads/artist_portfolio/${file.filename}`);
+
+      // Create one artwork row per uploaded image so admin and artist counts stay consistent.
+      for (let i = 0; i < imageUrls.length; i += 1) {
+        const imageUrl = imageUrls[i];
+        const resolvedTitle = imageUrls.length > 1
+          ? `${trimmedTitle} (${i + 1}/${imageUrls.length})`
+          : trimmedTitle;
+
         const result = await db.query(
           `INSERT INTO artworks (
-            artist_id, title, description, image_url, price, status, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+            artist_id, title, description, category_id, medium, dimensions,
+            price, image_url, image_urls, status, submission_source, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, CURRENT_TIMESTAMP)
           RETURNING *`,
           [
             artistId,
-            file.originalname || `Artwork_${Date.now()}`,
-            specialization && specialization.trim() ? specialization.trim() : null,
+            resolvedTitle,
+            description && String(description).trim()
+              ? String(description).trim()
+              : (specialization && specialization.trim() ? specialization.trim() : null),
+            category_id ? parseInt(category_id, 10) : null,
+            medium && String(medium).trim() ? String(medium).trim() : null,
+            dimensions && String(dimensions).trim() ? String(dimensions).trim() : null,
+            parsedPrice,
             imageUrl,
-            0,
-            'pending'
+            JSON.stringify([imageUrl]),
+            artworkStatus,
+            submissionSource,
           ]
         );
         createdArtworks.push(result.rows[0]);
       }
 
-      // Update artist's total artworks count
-      await db.query(
-        'UPDATE artists SET total_artworks = total_artworks + $1 WHERE id = $2',
-        [images.length, artistId]
-      );
+      // Keep denormalized count in sync with real artworks table.
+      await syncArtistArtworkCount(artistId);
 
       // Update specialization
       if (typeof specialization === 'string' && specialization.trim().length > 0) {
@@ -590,7 +816,9 @@ const artistController = {
 
       res.status(201).json({
         success: true,
-        message: 'Portfolio uploaded successfully. Your artworks are pending admin approval.',
+        message: isVerifiedArtist
+          ? 'Artwork uploaded with all images and published successfully.'
+          : 'Portfolio uploaded successfully. Your artwork is pending admin approval.',
         artworks: createdArtworks
       });
 
@@ -656,6 +884,14 @@ const artistController = {
     try {
       const artistId = req.user.id;
       const { bio, specialization, website_url, social_media } = req.body;
+
+      const artistRecordReady = await ensureArtistRecord(artistId);
+      if (!artistRecordReady) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Artist only."
+        });
+      }
 
       // Validate required fields
       if (!bio || !specialization) {
@@ -770,6 +1006,14 @@ const artistController = {
   getProfile: async (req, res) => {
     try {
       const artistId = req.user.id;
+
+      const artistRecordReady = await ensureArtistRecord(artistId);
+      if (!artistRecordReady) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Artist only."
+        });
+      }
 
       const query = `
         SELECT id, user_id, bio, specialization, profile_image, 

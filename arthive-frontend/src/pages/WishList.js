@@ -11,7 +11,6 @@ import {
   IconButton,
   Divider,
   Paper,
-  Chip,
   CircularProgress,
 } from '@mui/material';
 import {
@@ -30,6 +29,7 @@ const Wishlist = () => {
   const { wishlistItems, loading, addToCart, removeFromWishlist } = useCart();
   const navigate = useNavigate();
   const notification = useNotification();
+  const canAddToCart = !!user && ['buyer', 'user'].includes(user?.user_type);
 
   useEffect(() => {
     // Don't redirect while auth is still loading
@@ -56,6 +56,11 @@ const Wishlist = () => {
   };
 
   const handleMoveToCart = async (artwork) => {
+    if (!canAddToCart) {
+      notification.showWarning('Only buyers can add items to cart');
+      return;
+    }
+
     try {
       const result = await addToCart(artwork);
       if (result.success) {
@@ -160,8 +165,6 @@ const Wishlist = () => {
               : 'https://via.placeholder.com/300x200?text=No+Image';
 
             const artistName = item.artist?.name || item.artist || item.artistName || 'Unknown Artist';
-            const category = item.category || item.category_name;
-            const medium = item.medium || item.mediumName;
             const price = Number(item.price || 0);
 
             const addedDateRaw = item.addedDate || item.addedAt || item.added_at || item.createdAt || item.created_at;
@@ -217,13 +220,6 @@ const Wishlist = () => {
                           <Typography variant="body2" color="primary">{artistName}</Typography>
                         )}
                         
-                        {(category || medium) && (
-                          <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1 }}>
-                            {category && <Chip label={category} size="small" />}
-                            {medium && <Chip label={medium} size="small" variant="outlined" />}
-                          </Box>
-                        )}
-                        
                         {(item.year || item.dimensions) && (
                           <Typography variant="body2" color="text.secondary">
                             {[item.year, item.dimensions].filter(Boolean).join(' • ')}
@@ -263,9 +259,10 @@ const Wishlist = () => {
                     <Button
                       variant="contained"
                       startIcon={<CartIcon />}
+                      disabled={!canAddToCart}
                       onClick={() => handleMoveToCart(item)}
                     >
-                      Move to Cart
+                      {canAddToCart ? 'Move to Cart' : 'Buyers Only'}
                     </Button>
                   </Box>
                 </Box>

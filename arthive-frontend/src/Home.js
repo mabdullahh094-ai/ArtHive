@@ -64,7 +64,7 @@ const Home = () => {
       if (!healthCheck.ok) {
         throw new Error('Backend server is not responding');
       }
-      
+       
       // Fetch all data
       const [featuredData, categoriesData] = await Promise.allSettled([
         buyerAPI.getArtworks({ featured: true, limit: 4 }),

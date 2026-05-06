@@ -38,6 +38,9 @@ const Header = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
+  const normalizedUserType = String(user?.user_type || '').toLowerCase();
+  const artistDashboardPath = '/artist/dashboard';
+  const showArtistDashboard = normalizedUserType === 'artist';
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 12);
@@ -96,6 +99,21 @@ const Header = () => {
                 {link.label}
               </Button>
             ))}
+            {showArtistDashboard && (
+              <Button
+                component={Link}
+                to={artistDashboardPath}
+                color="inherit"
+                sx={{
+                  fontWeight: 700,
+                  px: 1.6,
+                  color: 'text.primary',
+                  '&:hover': { color: 'text.primary', backgroundColor: 'transparent' },
+                }}
+              >
+                Artist Dashboard
+              </Button>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, sm: 1 }, ml: 'auto' }}>
@@ -153,6 +171,13 @@ const Header = () => {
                 </ListItemButton>
               </ListItem>
             ))}
+            {showArtistDashboard && (
+              <ListItem disablePadding>
+                <ListItemButton component={Link} to={artistDashboardPath} onClick={() => setDrawerOpen(false)}>
+                  <ListItemText primary="Artist Dashboard" />
+                </ListItemButton>
+              </ListItem>
+            )}
           </List>
           <Box sx={{ mt: 'auto' }}>
             <Divider sx={{ my: 1 }} />

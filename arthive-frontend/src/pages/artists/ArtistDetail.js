@@ -8,7 +8,6 @@ import {
   Typography,
   Box,
   Button,
-  Chip,
   Divider,
   CircularProgress,
   Avatar,
@@ -21,7 +20,9 @@ import {
   ListItemAvatar,
   IconButton,
   Alert,
+  Stack,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   ArrowBack,
   Share,
@@ -30,8 +31,6 @@ import {
   Twitter,
   Instagram,
   Language,
-  CalendarToday,
-  LocationOn,
   Email,
   Phone,
 } from '@mui/icons-material';
@@ -47,7 +46,8 @@ const ArtistDetail = () => {
   const notification = useNotification();
   const { user } = useAuth();
   const { addToCart } = useCart();
-  
+  const canAddToCart = !!user && ['buyer', 'user'].includes(user?.user_type);
+
   const [artist, setArtist] = useState(null);
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,12 +76,15 @@ const ArtistDetail = () => {
         }
 
         const socialMedia = artistData.social_media || {};
+        const biographyParts = [artistData.specialization, artistData.bio].filter(
+          (value) => value && String(value).trim(),
+        );
         const displayArtist = {
           id: artistData.id,
           name: `${artistData.first_name || ''} ${artistData.last_name || ''}`.trim(),
           title: artistData.specialization || '',
-          bio: artistData.bio || 'No biography available.',
-          fullBio: artistData.bio || 'No biography available.',
+          bio: biographyParts.join(' • ') || 'No biography available.',
+          fullBio: biographyParts.join(' • ') || 'No biography available.',
           avatar: artistData.profile_pic_url || '',
           coverImage: artworksData[0]?.image_url || '',
           location: [artistData.city, artistData.country].filter(Boolean).join(', '),
@@ -159,8 +162,7 @@ const ArtistDetail = () => {
       navigate('/login');
       return;
     }
-    
-    // Implement follow functionality
+
     notification.showSuccess(`Following ${artist?.name}`);
   };
 
@@ -170,6 +172,12 @@ const ArtistDetail = () => {
       navigate('/login');
       return;
     }
+
+    if (!canAddToCart) {
+      notification.showWarning('Only buyers can add items to cart');
+      return;
+    }
+
     addToCart(artwork);
   };
 
@@ -187,11 +195,7 @@ const ArtistDetail = () => {
         <Alert severity="error" sx={{ mb: 3 }}>
           {error || 'Artist not found'}
         </Alert>
-        <Button
-          startIcon={<ArrowBack />}
-          onClick={() => navigate('/artists')}
-          sx={{ mt: 2 }}
-        >
+        <Button startIcon={<ArrowBack />} onClick={() => navigate('/artists')} sx={{ mt: 2 }}>
           Back to Artists
         </Button>
       </Container>
@@ -199,114 +203,74 @@ const ArtistDetail = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Artist Header */}
-      <Paper elevation={0} sx={{ mb: 4, borderRadius: 2, overflow: 'hidden' }}>
-        {/* Cover Image */}
+    <Container
+      maxWidth="xl"
+      sx={{
+        py: { xs: 2.5, md: 4 },
+        background:
+          'radial-gradient(circle at 0% 0%, rgba(37,99,235,0.08), transparent 30%), radial-gradient(circle at 100% 15%, rgba(245,158,11,0.08), transparent 28%)',
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 3,
+          borderRadius: 2.5,
+          overflow: 'hidden',
+          border: '1px solid rgba(15,23,42,0.08)',
+          boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
+          background: '#fff',
+        }}
+      >
         <Box
           sx={{
-            height: 200,
-            backgroundImage: artist.coverImage ? `url(${artist.coverImage})` : 'none',
+            height: { xs: 78, md: 98 },
+            backgroundImage: artist.coverImage
+              ? `linear-gradient(180deg, rgba(15,23,42,0.08), rgba(15,23,42,0.58)), url(${artist.coverImage})`
+              : 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 48%, #f59e0b 100%)',
             backgroundColor: artist.coverImage ? 'transparent' : 'rgba(15,23,42,0.08)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
           }}
         />
-        
-        <Box sx={{ p: 4 }}>
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={3}>
-              <Box sx={{ position: 'relative', mt: -8 }}>
-                <Avatar
-                  src={artist.avatar}
-                  alt={artist.name}
+
+        <Box sx={{ p: { xs: 1.25, md: 1.8 } }}>
+          <Grid container spacing={{ xs: 1.1, md: 1.6 }} alignItems="center">
+            <Grid item xs={12} md={2}>
+              <Box sx={{ position: 'relative', mt: { xs: -4.1, md: -4.8 }, display: 'flex', justifyContent: { xs: 'center', md: 'center' } }}>
+                <Box
                   sx={{
-                    width: 160,
-                    height: 160,
-                    border: '4px solid white',
-                    boxShadow: 3,
+                    p: 0.35,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #f59e0b 100%)',
+                    boxShadow: '0 6px 12px rgba(15,23,42,0.12)',
                   }}
-                />
+                >
+                  <Avatar
+                    src={artist.avatar}
+                    alt={artist.name}
+                    sx={{
+                      width: { xs: 76, md: 88 },
+                      height: { xs: 76, md: 88 },
+                      border: '3px solid white',
+                      boxShadow: '0 3px 10px rgba(15,23,42,0.12)',
+                    }}
+                  />
+                </Box>
               </Box>
             </Grid>
-            
-            <Grid item xs={12} md={9}>
+
+            <Grid item xs={12} md={10}>
               <Box>
-                <Typography variant="h3" gutterBottom>
+                <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, fontSize: { xs: '1.1rem', md: '1.55rem' }, lineHeight: 1.1, mb: 0.2, textAlign: { xs: 'center', md: 'left' } }}>
                   {artist.name}
                 </Typography>
-                
-                {artist.title && (
-                  <Typography variant="h6" color="textSecondary" gutterBottom>
-                    {artist.title}
-                  </Typography>
-                )}
 
-                <Box display="flex" gap={2} alignItems="center" flexWrap="wrap" mb={2}>
-                  {artist.location && (
-                    <Chip
-                      icon={<LocationOn />}
-                      label={artist.location}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                  {artist.yearsActive && (
-                    <Chip
-                      icon={<CalendarToday />}
-                      label={artist.yearsActive}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                  {artist.categories?.map((cat, index) => (
-                    <Chip
-                      key={index}
-                      label={cat}
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                    />
-                  ))}
-                </Box>
-
-                <Typography variant="body1" paragraph>
-                  {artist.bio}
-                </Typography>
-
-                {/* Stats */}
-                <Box display="flex" gap={4} mb={3}>
-                  <Box textAlign="center">
-                    <Typography variant="h5" color="primary">
-                      {artist.artworksCount}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      Artworks
-                    </Typography>
-                  </Box>
-                  <Box textAlign="center">
-                    <Typography variant="h5" color="primary">
-                      {artist.followers}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      Followers
-                    </Typography>
-                  </Box>
-                  <Box textAlign="center">
-                    <Typography variant="h5" color="primary">
-                      {artist.rating}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      Rating
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Box display="flex" gap={2} mt={3} flexWrap="wrap">
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.65} mt={0.8} flexWrap="wrap" useFlexGap alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent={{ xs: 'center', md: 'flex-start' }}>
                   <Button
                     variant="contained"
-                    color="primary"
+                    sx={{ borderRadius: 2, px: 1.35, py: 0.55, fontWeight: 700, boxShadow: 'none', fontSize: '0.62rem' }}
                     startIcon={<Favorite />}
                     onClick={handleFollow}
                   >
@@ -314,47 +278,55 @@ const ArtistDetail = () => {
                   </Button>
                   <Button
                     variant="outlined"
+                    sx={{ borderRadius: 2, px: 1.35, py: 0.55, fontWeight: 700, fontSize: '0.62rem' }}
                     startIcon={<Share />}
                     onClick={handleShare}
                   >
                     Share
                   </Button>
-                  
-                  {/* Social Links */}
+
                   {artist.socialLinks && (
-                    <Box display="flex" gap={1} ml="auto">
+                    <Stack direction="row" spacing={0.5} sx={{ ml: { xs: 0, sm: 'auto' } }}>
                       {artist.socialLinks.website && (
-                        <IconButton href={artist.socialLinks.website} target="_blank" size="small">
+                        <IconButton href={artist.socialLinks.website} target="_blank" size="small" sx={{ backgroundColor: alpha('#2563eb', 0.06) }}>
                           <Language />
                         </IconButton>
                       )}
                       {artist.socialLinks.facebook && (
-                        <IconButton href={artist.socialLinks.facebook} target="_blank" size="small">
+                        <IconButton href={artist.socialLinks.facebook} target="_blank" size="small" sx={{ backgroundColor: alpha('#2563eb', 0.06) }}>
                           <Facebook />
                         </IconButton>
                       )}
                       {artist.socialLinks.twitter && (
-                        <IconButton href={artist.socialLinks.twitter} target="_blank" size="small">
+                        <IconButton href={artist.socialLinks.twitter} target="_blank" size="small" sx={{ backgroundColor: alpha('#2563eb', 0.06) }}>
                           <Twitter />
                         </IconButton>
                       )}
                       {artist.socialLinks.instagram && (
-                        <IconButton href={artist.socialLinks.instagram} target="_blank" size="small">
+                        <IconButton href={artist.socialLinks.instagram} target="_blank" size="small" sx={{ backgroundColor: alpha('#2563eb', 0.06) }}>
                           <Instagram />
                         </IconButton>
                       )}
-                    </Box>
+                    </Stack>
                   )}
-                </Box>
+                </Stack>
               </Box>
             </Grid>
           </Grid>
         </Box>
       </Paper>
 
-      {/* Tabs Section */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tabValue} onChange={handleTabChange}>
+      <Box sx={{ mb: 3 }}>
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTabs-indicator': { height: 3, borderRadius: 2 },
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 44 },
+          }}
+        >
           <Tab label="Artworks" />
           <Tab label="About" />
           <Tab label="Exhibitions" />
@@ -362,31 +334,37 @@ const ArtistDetail = () => {
         </Tabs>
       </Box>
 
-      {/* Tab Content */}
       {tabValue === 0 && (
         <>
-          <Typography variant="h5" gutterBottom>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 800, mb: 2 }}>
             Artworks by {artist.name}
           </Typography>
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 1.25, sm: 1.5, md: 2 }}>
             {artworks.map((artwork) => (
-              <Grid item xs={12} sm={6} md={3} key={artwork.id}>
-                <Card 
-                  sx={{ 
+              <Grid item xs={12} sm={6} md={4} lg={3} key={artwork.id}>
+                <Card
+                  sx={{
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderRadius: 2,
-                    transition: 'transform 0.2s',
-                    '&:hover': { transform: 'translateY(-4px)' }
+                    borderRadius: 2.5,
+                    border: '1px solid rgba(15,23,42,0.08)',
+                    boxShadow: '0 10px 24px rgba(15,23,42,0.08)',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    overflow: 'hidden',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 12px 20px rgba(15,23,42,0.1)',
+                    },
                   }}
                 >
                   <Box
                     sx={{
-                      height: 220,
+                      height: { xs: 160, sm: 175 },
                       backgroundColor: '#f5f5f5',
                       overflow: 'hidden',
                       cursor: 'pointer',
+                      position: 'relative',
                     }}
                     onClick={() => navigate(`/artwork/${artwork.id}`)}
                   >
@@ -401,37 +379,55 @@ const ArtistDetail = () => {
                         display: 'block',
                       }}
                     />
+                    <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(15,23,42,0.02), rgba(15,23,42,0.18))' }} />
                   </Box>
-                  <CardContent sx={{ flexGrow: 1, minHeight: 165, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <Typography 
-                      variant="h6" 
-                      noWrap
+
+                  <CardContent sx={{ flexGrow: 1, minHeight: 150, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', p: 1.15 }}>
+                    <Typography
                       component={Link}
                       to={`/artwork/${artwork.id}`}
-                      sx={{ 
+                      sx={{
                         textDecoration: 'none',
                         color: 'inherit',
-                        '&:hover': { color: 'primary.main' }
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        minHeight: 34,
+                        '&:hover': { color: 'primary.main' },
                       }}
                     >
                       {artwork.title}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
+
+                    <Typography variant="body2" color="textSecondary" sx={{ fontSize: '0.68rem', mt: 0.25 }} noWrap>
                       {artwork.year} • {artwork.medium}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary" noWrap>
+                    <Typography variant="body2" color="textSecondary" sx={{ fontSize: '0.66rem' }} noWrap>
                       {artwork.dimensions}
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                      <Typography variant="h6" color="primary">
-                        ${(Number(artwork.price) || 0).toLocaleString()}
-                      </Typography>
+
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.05 }}>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.62rem' }}>
+                          Price
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: '#f57224', fontWeight: 800, lineHeight: 1.05, fontSize: '0.98rem' }}>
+                          ${(Number(artwork.price) || 0).toLocaleString()}
+                        </Typography>
+                      </Box>
+
                       <Button
                         size="small"
-                        variant="contained"
+                        variant="outlined"
+                        sx={{ borderRadius: 1.5, fontSize: '0.62rem', fontWeight: 700, minWidth: 88, px: 1, py: 0.45, borderColor: 'rgba(245,114,36,0.55)', color: '#f57224' }}
+                        disabled={!canAddToCart}
                         onClick={() => handleAddToCart(artwork)}
                       >
-                        Add to Cart
+                        {canAddToCart ? 'Add to Cart' : 'Buyers Only'}
                       </Button>
                     </Box>
                   </CardContent>
@@ -450,38 +446,35 @@ const ArtistDetail = () => {
       )}
 
       {tabValue === 1 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h5" gutterBottom>
+        <Paper sx={{ p: { xs: 2.2, md: 3 }, borderRadius: 3, border: '1px solid rgba(15,23,42,0.08)' }}>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 800 }}>
             Biography
           </Typography>
           <Typography variant="body1" paragraph>
             {artist.fullBio || artist.bio}
           </Typography>
-          
+
           <Divider sx={{ my: 3 }} />
-          
+
           {artist.education && artist.education.length > 0 && (
             <>
-              <Typography variant="h6" gutterBottom>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                 Education & Training
               </Typography>
               <List>
                 {artist.education.map((edu, index) => (
                   <ListItem key={index}>
-                    <ListItemText
-                      primary={edu.institution}
-                      secondary={`${edu.degree}, ${edu.year}`}
-                    />
+                    <ListItemText primary={edu.institution} secondary={`${edu.degree}, ${edu.year}`} />
                   </ListItem>
                 ))}
               </List>
               <Divider sx={{ my: 3 }} />
             </>
           )}
-          
+
           {artist.awards && artist.awards.length > 0 && (
             <>
-              <Typography variant="h6" gutterBottom>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                 Awards & Recognition
               </Typography>
               <List>
@@ -497,18 +490,15 @@ const ArtistDetail = () => {
       )}
 
       {tabValue === 2 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h5" gutterBottom>
+        <Paper sx={{ p: { xs: 2.2, md: 3 }, borderRadius: 3, border: '1px solid rgba(15,23,42,0.08)' }}>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 800 }}>
             Exhibitions
           </Typography>
           {artist.exhibitions && artist.exhibitions.length > 0 ? (
             <List>
               {artist.exhibitions.map((exhibition, index) => (
                 <ListItem key={index}>
-                  <ListItemText
-                    primary={exhibition.title}
-                    secondary={`${exhibition.gallery}, ${exhibition.year}`}
-                  />
+                  <ListItemText primary={exhibition.title} secondary={`${exhibition.gallery}, ${exhibition.year}`} />
                 </ListItem>
               ))}
             </List>
@@ -521,8 +511,8 @@ const ArtistDetail = () => {
       )}
 
       {tabValue === 3 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h5" gutterBottom>
+        <Paper sx={{ p: { xs: 2.2, md: 3 }, borderRadius: 3, border: '1px solid rgba(15,23,42,0.08)' }}>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 800 }}>
             Contact Information
           </Typography>
           {artist.contact && (
@@ -534,10 +524,7 @@ const ArtistDetail = () => {
                       <Email />
                     </Avatar>
                   </ListItemAvatar>
-                  <ListItemText
-                    primary="Email"
-                    secondary={artist.contact.email}
-                  />
+                  <ListItemText primary="Email" secondary={artist.contact.email} />
                 </ListItem>
               )}
               {artist.contact.phone && (
@@ -547,15 +534,12 @@ const ArtistDetail = () => {
                       <Phone />
                     </Avatar>
                   </ListItemAvatar>
-                  <ListItemText
-                    primary="Phone"
-                    secondary={artist.contact.phone}
-                  />
+                  <ListItemText primary="Phone" secondary={artist.contact.phone} />
                 </ListItem>
               )}
             </List>
           )}
-          
+
           <Typography variant="body2" color="textSecondary" sx={{ mt: 3 }}>
             For inquiries about artwork purchases or commissions, please contact the artist directly.
           </Typography>

@@ -59,9 +59,9 @@ const Login = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
+    <Container maxWidth="xs" sx={{ py: 6 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+        <Typography variant="h5" align="center" gutterBottom sx={{ fontWeight: 700 }}>
           Sign In
         </Typography>
 
@@ -104,14 +104,18 @@ const Login = () => {
             fullWidth
             variant="contained"
             disabled={loading}
-            sx={{ mt: 3 }}
+            sx={{ mt: 2.5 }}
           >
             {loading ? "Signing In..." : "Sign In"}
           </Button>
 
-          <Typography align="center" sx={{ mt: 2 }}>
+          <Typography align="right" sx={{ mt: 1, fontSize: '0.9rem' }}>
+            <Link to="/forgot-password" style={{ color: '#1976d2', fontWeight: 600 }}>Forgot password?</Link>
+          </Typography>
+
+          <Typography align="center" sx={{ mt: 1.5, fontSize: '0.9rem' }}>
             Don't have an account?{" "}
-            <Link to="/register">Sign Up</Link>
+            <Link to="/register" style={{ color: '#1976d2', fontWeight: 600 }}>Sign Up</Link>
           </Typography>
         </Box>
       </Paper>

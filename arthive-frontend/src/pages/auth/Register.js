@@ -1,15 +1,17 @@
 // register.js - UPDATED VERSION
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   Container, Paper, TextField, Button, Typography, Box, Alert,
   MenuItem, Select, FormControl, InputLabel 
 } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
+import { normalizeEmailInput, toTitleCaseInput } from "../../utils/formatters";
 
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
+  const [isAccountTypeOpen, setIsAccountTypeOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     first_name: "",
@@ -22,6 +24,18 @@ const Register = () => {
   
   const [message, setMessage] = useState({ text: "", type: "" });
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsAccountTypeOpen(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
 
   // Password validation helper
   const validatePassword = (pwd) => {
@@ -37,13 +51,28 @@ const Register = () => {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === 'email' && emailError) {
+      setEmailError('');
+    }
+
+    let nextValue = value;
+    if (name === 'email') {
+      nextValue = normalizeEmailInput(value);
+    }
+    if (name === 'first_name' || name === 'last_name') {
+      nextValue = toTitleCaseInput(value);
+    }
+
+    setFormData({ ...formData, [name]: nextValue });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ text: "", type: "" });
+    setEmailError("");
 
     // Validate password strength
     const pwdCheck = validatePassword(formData.password);
@@ -97,14 +126,22 @@ const Register = () => {
           navigate('/login', { replace: true });
         }, 1500);
       } else {
+        const errorText = result.error || "Registration failed";
+        if (/already exists|already registered/i.test(errorText)) {
+          setEmailError('This email is already registered. Please login.');
+        }
         setMessage({ 
-          text: result.error || "Registration failed", 
+          text: errorText,
           type: "error" 
         });
       }
     } catch (error) {
+      const errorText = "An error occurred: " + error.message;
+      if (/already exists|already registered/i.test(errorText)) {
+        setEmailError('This email is already registered. Please login.');
+      }
       setMessage({ 
-        text: "An error occurred: " + error.message, 
+        text: errorText,
         type: "error" 
       });
     } finally {
@@ -113,9 +150,9 @@ const Register = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
+    <Container maxWidth="sm" sx={{ py: 6 }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 3, maxWidth: 520, mx: 'auto' }}>
+        <Typography variant="h5" align="center" gutterBottom sx={{ fontWeight: 700 }}>
           Sign Up
         </Typography>
         
@@ -161,6 +198,8 @@ const Register = () => {
             margin="normal"
             required
             disabled={loading}
+            error={!!emailError}
+            helperText={emailError || ''}
           />
           
           {/* Password */}
@@ -198,6 +237,25 @@ const Register = () => {
               value={formData.user_type}
               onChange={handleChange}
               label="Account Type"
+              open={isAccountTypeOpen}
+              onOpen={() => setIsAccountTypeOpen(true)}
+              onClose={() => setIsAccountTypeOpen(false)}
+              MenuProps={{
+                disablePortal: true,
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'left',
+                },
+                PaperProps: {
+                  sx: {
+                    mt: 0.5,
+                  },
+                },
+              }}
             >
               <MenuItem value="buyer">Buyer (Purchase Art)</MenuItem>
               <MenuItem value="artist">Artist (Sell Art)</MenuItem>
@@ -210,14 +268,14 @@ const Register = () => {
             variant="contained"
             size="large"
             disabled={loading}
-            sx={{ mt: 3, mb: 2 }}
+            sx={{ mt: 2.5, mb: 1.5 }}
           >
             {loading ? "Creating Account..." : "Sign Up"}
           </Button>
           
-          <Typography align="center" sx={{ mt: 2 }}>
+          <Typography align="center" sx={{ mt: 1.5, fontSize: '0.9rem' }}>
             Already have an account?{" "}
-            <Link to="/login" style={{ textDecoration: "none" }}>
+            <Link to="/login" style={{ textDecoration: "none", color: '#1976d2', fontWeight: 600 }}>
               Sign In
             </Link>
           </Typography>

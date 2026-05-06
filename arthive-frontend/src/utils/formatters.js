@@ -30,3 +30,14 @@ export const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
+// Input helpers
+export const toTitleCaseInput = (value = '') => {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\b([a-z])/g, (match) => match.toUpperCase());
+};
+
+export const normalizeEmailInput = (value = '') => {
+  if (typeof value !== 'string') return '';
+  return value.toLowerCase().replace(/\s+/g, '');
+};

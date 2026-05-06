@@ -1,0 +1,85 @@
+{
+  "numerical_features": [
+    "width_cm",
+    "height_cm",
+    "size_cm2",
+    "aspect_ratio",
+    "artist_experience_years",
+    "artist_previous_sales",
+    "artist_reputation_score",
+    "edition_size",
+    "year_created",
+    "time_taken_hours",
+    "ai_quality_score",
+    "ai_authenticity_score",
+    "image_brightness_score",
+    "image_contrast_score",
+    "composition_score",
+    "color_harmony_score",
+    "subject_complexity_score",
+    "market_demand_index"
+  ],
+  "categorical_features": [
+    "medium",
+    "style",
+    "country",
+    "is_original",
+    "condition"
+  ],
+  "categorical_classes": {
+    "medium": [
+      "acrylic",
+      "charcoal",
+      "digital",
+      "gouache",
+      "ink",
+      "mixed_media",
+      "oil",
+      "pastel",
+      "watercolor"
+    ],
+    "style": [
+      "abstract",
+      "conceptual",
+      "expressionism",
+      "impressionism",
+      "landscape",
+      "minimalism",
+      "pop_art",
+      "portrait",
+      "realism",
+      "surrealism"
+    ],
+    "country": [
+      "Bangladesh",
+      "Canada",
+      "France",
+      "Germany",
+      "India",
+      "Italy",
+      "Japan",
+      "Pakistan",
+      "Turkey",
+      "UAE",
+      "UK",
+      "USA"
+    ],
+    "is_original": [
+      "0",
+      "1"
+    ],
+    "condition": [
+      "excellent",
+      "fair",
+      "good",
+      "new"
+    ]
+  },
+  "model_metrics": {
+    "rmse": 714.0758831371643,
+    "mae": 507.80888357897936,
+    "r2_score": 0.7745691670028471,
+    "training_samples": 4000,
+    "testing_samples": 1000
+  }
+}

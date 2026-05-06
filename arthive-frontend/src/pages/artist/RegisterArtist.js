@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
 import { authAPI } from '../../services/api';
+import { normalizeEmailInput, toTitleCaseInput } from '../../utils/formatters';
 
 const RegisterArtist = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ first_name: '', last_name: '', email: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [emailError, setEmailError] = useState('');
 
   const validatePassword = (pwd) => {
     if (!pwd) return { ok: false, msg: 'Password is required' };
@@ -18,11 +20,28 @@ const RegisterArtist = () => {
     return { ok: true };
   };
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'email' && emailError) {
+      setEmailError('');
+    }
+
+    let nextValue = value;
+    if (name === 'email') {
+      nextValue = normalizeEmailInput(value);
+    }
+    if (name === 'first_name' || name === 'last_name') {
+      nextValue = toTitleCaseInput(value);
+    }
+
+    setFormData({ ...formData, [name]: nextValue });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
+    setEmailError('');
 
     const pwdCheck = validatePassword(formData.password);
     if (!pwdCheck.ok) return setMessage({ text: pwdCheck.msg, type: 'error' });
@@ -50,6 +69,9 @@ const RegisterArtist = () => {
       }
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Registration error';
+      if (/already exists|already registered/i.test(msg)) {
+        setEmailError('This email is already registered. Please login.');
+      }
       setMessage({ text: msg, type: 'error' });
     } finally {
       setLoading(false);
@@ -64,7 +86,7 @@ const RegisterArtist = () => {
         <Box component="form" onSubmit={handleSubmit}>
           <TextField fullWidth label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} margin="normal" required />
           <TextField fullWidth label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} margin="normal" required />
-          <TextField fullWidth label="Email" name="email" type="email" value={formData.email} onChange={handleChange} margin="normal" required />
+          <TextField fullWidth label="Email" name="email" type="email" value={formData.email} onChange={handleChange} margin="normal" error={!!emailError} helperText={emailError || ''} required />
           <TextField fullWidth label="Password" name="password" type="password" value={formData.password} onChange={handleChange} margin="normal" helperText="8-15 chars, 1 uppercase, 1 lowercase, 1 special" required />
           <TextField fullWidth label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} margin="normal" required />
           <Button type="submit" fullWidth variant="contained" sx={{ mt: 3 }}>{loading ? 'Creating...' : 'Create Artist Account'}</Button>

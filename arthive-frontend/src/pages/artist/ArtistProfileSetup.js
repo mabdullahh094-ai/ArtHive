@@ -14,6 +14,7 @@ import { Person } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { artistAPI, authAPI } from '../../services/api';
 import { isValidPhone } from '../../utils/validators';
+import { normalizeEmailInput, toTitleCaseInput } from '../../utils/formatters';
 
 const ArtistProfileSetup = () => {
   const navigate = useNavigate();
@@ -91,7 +92,20 @@ const ArtistProfileSetup = () => {
     };
   }, [handleRedirectToDashboard]);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+
+    if (name === 'contact_email') {
+      nextValue = normalizeEmailInput(value);
+    }
+
+    if (['first_name', 'last_name', 'city', 'country', 'address'].includes(name)) {
+      nextValue = toTitleCaseInput(value);
+    }
+
+    setForm({ ...form, [name]: nextValue });
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -179,6 +193,7 @@ const ArtistProfileSetup = () => {
           portfolioFormData.append('images', file);
         });
         portfolioFormData.append('specialization', form.bio);
+        portfolioFormData.append('submission_context', 'portfolio_review');
         await artistAPI.uploadPortfolio(portfolioFormData);
         setExistingPortfolioCount((prev) => prev + portfolioImages.length);
         setPortfolioImages([]);

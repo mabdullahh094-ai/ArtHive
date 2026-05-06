@@ -17,6 +17,13 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const clearAuthState = useCallback(() => {
+    setUser(null);
+    setIsAuthenticated(false);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   // Check if user is logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -40,6 +47,14 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    window.addEventListener('arthive:auth-cleared', clearAuthState);
+
+    return () => {
+      window.removeEventListener('arthive:auth-cleared', clearAuthState);
+    };
+  }, [clearAuthState]);
 
   // Login function
   const login = useCallback(async (email, password) => {
@@ -108,13 +123,11 @@ export const AuthProvider = ({ children }) => {
       // Clear cart/wishlist when logging out
       localStorage.removeItem('arthive_local_wishlist');
       localStorage.removeItem('arthive_local_cart');
-      setUser(null);
-      setIsAuthenticated(false);
-      setError(null);
+      clearAuthState();
     } catch (err) {
       console.error('Logout error:', err);
     }
-  }, []);
+  }, [clearAuthState]);
 
   // Update user profile
   const updateProfile = useCallback(async (updatedUserData) => {

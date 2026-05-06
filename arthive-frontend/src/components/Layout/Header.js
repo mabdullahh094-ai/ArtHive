@@ -263,8 +263,8 @@ const Header = () => {
       ]
     : [
         { label: 'Profile', path: '/profile', icon: <Person /> },
-        { label: 'Dashboard', path: user?.user_type === 'artist' ? '/artist/dashboard' : '/dashboard', icon: <Dashboard /> },
-        { label: 'My Orders', path: '/orders', icon: <Store /> },
+        { label: user?.user_type === 'artist' ? 'Artist Dashboard' : 'Dashboard', path: user?.user_type === 'artist' ? '/artist/dashboard' : '/dashboard', icon: <Dashboard /> },
+        ...(user?.user_type === 'buyer' ? [{ label: 'My Orders', path: '/orders', icon: <Store /> }] : []),
         { label: 'Logout', action: handleLogout, icon: <ExitToApp /> },
       ];
   
@@ -506,6 +506,7 @@ const Header = () => {
             </Button>
           )}
         </Box>
+
         
         {/* Spacer */}
         <Box sx={{ flexGrow: 1 }} />

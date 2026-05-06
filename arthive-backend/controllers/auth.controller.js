@@ -1,7 +1,23 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const os = require('os');
 const db = require('../config/db');
 const emailService = require('../services/emailService');
+
+const getJwtBaseSecret = () => process.env.JWT_SECRET || 'dev-secret-change-me';
+const getResetSecret = (passwordHash) => `${getJwtBaseSecret()}::${passwordHash}`;
+
+const getLanIpv4 = () => {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    for (const net of iface || []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+};
 
 const ensureArtistProfileColumns = async () => {
   await db.query(`
@@ -17,15 +33,15 @@ const ensureArtistProfileColumns = async () => {
 const authController = {
   // -------------------- REGISTER --------------------
   register: async (req, res, next) => {
-    let { 
-      email, 
-      password, 
-      first_name, 
-      last_name, 
+    let {
+      email,
+      password,
+      first_name,
+      last_name,
       user_type = 'buyer',
       bio,
       website_url,
-      social_media 
+      social_media
     } = req.body;
 
     // Trim whitespace from string fields
@@ -40,24 +56,24 @@ const authController = {
   // Log entire request body for debugging
   console.log('Full request body:', JSON.stringify(req.body, null, 2));
       if (!email || !password || !first_name || !last_name) {
-        console.log('❌ Validation failed - missing fields:', { 
-          email: !!email, 
-          password: !!password, 
-          first_name: !!first_name, 
-          last_name: !!last_name 
+        console.log('❌ Validation failed - missing fields:', {
+          email: !!email,
+          password: !!password,
+          first_name: !!first_name,
+          last_name: !!last_name
         });
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'All fields are required' 
+          message: 'All fields are required'
         });
       }
 
       // Validate user_type
       if (user_type && !['buyer', 'artist', 'admin'].includes(user_type)) {
         console.log('❌ Invalid user_type:', user_type);
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: 'Invalid user type. Must be buyer or artist' 
+          message: 'Invalid user type. Must be buyer or artist'
         });
       }
       // Check if user already exists
@@ -67,9 +83,9 @@ const authController = {
       );
 
       if (existingUser.rows.length > 0) {
-        return res.status(400).json({ 
+        return res.status(409).json({
           success: false,
-          message: 'User already exists' 
+          message: 'An account with this email already exists. Please login.'
         });
       }
 
@@ -123,6 +139,14 @@ const authController = {
           { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
         );
 
+        // Send a welcome/login email after successful signup.
+        await emailService.sendAccountCreatedEmail({
+          email: newUser.rows[0].email,
+          first_name: newUser.rows[0].first_name,
+          last_name: newUser.rows[0].last_name,
+          user_type: newUser.rows[0].user_type
+        });
+
         res.status(201).json({
           success: true,
           message: 'Registration successful',
@@ -156,7 +180,7 @@ const authController = {
       console.log('🔐 Login attempt:', { email: safeEmail });
 
       const user = await db.query(
-        `SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, 
+        `SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name,
                 u.user_type, u.status, u.profile_pic_url,
                 a.bio as artist_bio, a.verification_status as artist_verification_status,
                 a.total_artworks, a.total_sales
@@ -168,9 +192,9 @@ const authController = {
 
       if (user.rows.length === 0) {
         console.log('❌ Login failed: user not found for email', safeEmail);
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: 'Invalid credentials' 
+          message: 'Invalid credentials'
         });
       }
 
@@ -178,17 +202,17 @@ const authController = {
       const isValidPassword = await bcrypt.compare(password, user.rows[0].password_hash);
       if (!isValidPassword) {
         console.log('❌ Login failed: bad password for email', safeEmail);
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: 'Invalid credentials' 
+          message: 'Invalid credentials'
         });
       }
 
       // Check account status
       if (user.rows[0].status !== 'active') {
-        return res.status(403).json({ 
+        return res.status(403).json({
           success: false,
-          message: 'Account is not active' 
+          message: 'Account is not active'
         });
       }
 
@@ -242,17 +266,186 @@ const authController = {
     }
   },
 
+  // -------------------- FORGOT PASSWORD --------------------
+  forgotPassword: async (req, res) => {
+    try {
+      const email = String(req.body?.email || '').trim().toLowerCase();
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+      }
+
+      const userResult = await db.query(
+        `SELECT id, email, first_name, last_name, password_hash
+         FROM users
+         WHERE email = $1
+         LIMIT 1`,
+        [email]
+      );
+
+      if (userResult.rows.length > 0) {
+        const user = userResult.rows[0];
+        const token = jwt.sign(
+          {
+            userId: user.id,
+            email: user.email,
+            purpose: 'password_reset'
+          },
+          getResetSecret(user.password_hash),
+          { expiresIn: '30m' }
+        );
+
+        const requestHost = (req.get('host') || '').trim();
+        const hostIsLocal = /localhost|127\.0\.0\.1/i.test(requestHost);
+        const lanIp = getLanIpv4();
+        const configuredBackendUrl = (process.env.BACKEND_URL || '').trim();
+
+        const backendBaseUrl =
+          (hostIsLocal && lanIp ? `http://${lanIp}:3001` : null) ||
+          (requestHost ? `${req.protocol}://${requestHost}` : null) ||
+          configuredBackendUrl ||
+          'http://localhost:3001';
+        const resetUrl = `${backendBaseUrl.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
+
+        const emailResult = await emailService.sendPasswordResetEmail({
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          resetUrl
+        });
+
+        if (!emailResult.success) {
+          throw new Error(emailResult.error || 'Failed to send password reset email');
+        }
+      }
+
+      // Return generic response to avoid exposing whether email exists.
+      return res.json({
+        success: true,
+        message: 'If an account exists for this email, a password reset link has been sent.'
+      });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process forgot password request'
+      });
+    }
+  },
+
+  // -------------------- RESET PASSWORD --------------------
+  resetPassword: async (req, res) => {
+    try {
+      const token = String(req.body?.token || '').trim();
+      const password = String(req.body?.password || '').trim();
+
+      if (!token || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token and new password are required'
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+      }
+
+      const decodedUntrusted = jwt.decode(token);
+      if (!decodedUntrusted?.userId || !decodedUntrusted?.email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid reset token'
+        });
+      }
+
+      const userResult = await db.query(
+        `SELECT id, email, password_hash
+         FROM users
+         WHERE id = $1 AND email = $2
+         LIMIT 1`,
+        [decodedUntrusted.userId, decodedUntrusted.email]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      const user = userResult.rows[0];
+
+      let decodedVerified;
+      try {
+        decodedVerified = jwt.verify(token, getResetSecret(user.password_hash));
+      } catch (verifyError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired reset token'
+        });
+      }
+
+      if (decodedVerified.purpose !== 'password_reset') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid reset token purpose'
+        });
+      }
+
+      const isSameAsOldPassword = await bcrypt.compare(password, user.password_hash);
+      if (isSameAsOldPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already used this password before. Please choose a different password.'
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+
+      await db.query(
+        `UPDATE users
+         SET password_hash = $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [passwordHash, user.id]
+      );
+
+      return res.json({
+        success: true,
+        message: 'Password reset successful. You can now login with your new password.'
+      });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to reset password'
+      });
+    }
+  },
+
   // -------------------- GET PROFILE --------------------
   getProfile: async (req, res) => {
     try {
       await ensureArtistProfileColumns();
 
       const user = await db.query(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.user_type, 
+        `SELECT u.id, u.email, u.first_name, u.last_name, u.user_type,
                 u.profile_pic_url, u.status, u.created_at,
                 a.bio, a.website_url, a.social_media, a.verification_status,
                 a.city, a.country, a.contact_email, a.address, a.phone_number,
-                a.total_artworks, a.total_sales
+                (
+                  SELECT COUNT(*)::int
+                  FROM artworks aw
+                  WHERE aw.artist_id = u.id
+                ) as total_artworks,
+                a.total_sales
          FROM users u
          LEFT JOIN artists a ON u.id = a.id
          WHERE u.id = $1`,

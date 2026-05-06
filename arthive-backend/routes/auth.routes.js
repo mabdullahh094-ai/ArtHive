@@ -27,6 +27,8 @@ const profilePicUpload = multer({ storage: profilePicStorage });
 // -------------------- Public Routes --------------------
 router.post("/register", authController.register);
 router.post("/login", authController.login);
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
 
 // -------------------- Protected Routes --------------------
 router.get("/profile", auth.verifyToken, authController.getProfile);

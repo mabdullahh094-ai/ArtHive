@@ -2,6 +2,26 @@ const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const emailService = require("../services/emailService");
 
+const ensureArtworkSubmissionSourceColumn = async () => {
+  await db.query(`
+    ALTER TABLE artworks
+    ADD COLUMN IF NOT EXISTS submission_source VARCHAR(32) DEFAULT 'dashboard'
+  `);
+};
+
+const syncArtistReviewArtworks = async (artistId, verificationStatus, client = db) => {
+  const mappedStatus = verificationStatus === 'verified' ? 'approved' : 'rejected';
+
+  await client.query(
+    `UPDATE artworks
+     SET status = $1,
+         submission_source = 'portfolio_review'
+     WHERE artist_id = $2
+       AND status = 'pending'`,
+    [mappedStatus, artistId]
+  );
+};
+
 const adminController = {
   // Get pending artworks
   getPendingArtworks: async (req, res) => {
@@ -184,6 +204,8 @@ const adminController = {
       const { id } = req.params;
       const { verification_status } = req.body;
 
+      await ensureArtworkSubmissionSourceColumn();
+
       // Validate status
       if (!['verified', 'rejected'].includes(verification_status)) {
         return res.status(400).json({
@@ -209,20 +231,36 @@ const adminController = {
         }
       }
 
-      // Update artist verification status
-      const result = await db.query(
-        `UPDATE artists
-         SET verification_status = $1
-         WHERE id = $2
-         RETURNING *`,
-        [verification_status, id]
-      );
+      const client = await db.pool.connect();
+      let result;
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Artist not found"
-        });
+      try {
+        await client.query('BEGIN');
+
+        result = await client.query(
+          `UPDATE artists
+           SET verification_status = $1
+           WHERE id = $2
+           RETURNING *`,
+          [verification_status, id]
+        );
+
+        if (result.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({
+            success: false,
+            message: "Artist not found"
+          });
+        }
+
+        await syncArtistReviewArtworks(id, verification_status, client);
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
 
       res.json({
@@ -280,6 +318,69 @@ const adminController = {
       res.status(500).json({
         success: false,
         message: "Failed to fetch buyers"
+      });
+    }
+  },
+
+  // Get all orders for admin with revenue summary
+  getAllOrders: async (req, res) => {
+    try {
+      const { page = 1, limit = 50 } = req.query;
+      const parsedPage = parseInt(page, 10);
+      const parsedLimit = parseInt(limit, 10);
+      const offset = (parsedPage - 1) * parsedLimit;
+
+      const ordersResult = await db.query(
+        `SELECT
+           o.id,
+           o.order_number,
+           o.total_amount,
+           o.status,
+           o.created_at,
+           o.tracking_number,
+           u.first_name as buyer_first_name,
+           u.last_name as buyer_last_name,
+           u.email as buyer_email,
+           COUNT(*) OVER() as total_count
+         FROM orders o
+         JOIN users u ON o.buyer_id = u.id
+         ORDER BY o.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        [parsedLimit, offset]
+      );
+
+      const revenueResult = await db.query(
+        `SELECT
+           COUNT(*) as total_orders,
+           COUNT(*) FILTER (WHERE status = 'completed') as completed_orders,
+           COALESCE(SUM(total_amount), 0) as gross_revenue,
+           COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed'), 0) as completed_revenue
+         FROM orders`
+      );
+
+      const revenue = revenueResult.rows[0] || {};
+
+      return res.json({
+        success: true,
+        orders: ordersResult.rows,
+        revenue: {
+          total_orders: parseInt(revenue.total_orders || 0, 10),
+          completed_orders: parseInt(revenue.completed_orders || 0, 10),
+          gross_revenue: parseFloat(revenue.gross_revenue || 0).toFixed(2),
+          completed_revenue: parseFloat(revenue.completed_revenue || 0).toFixed(2),
+        },
+        pagination: {
+          page: parsedPage,
+          limit: parsedLimit,
+          total: ordersResult.rows[0]?.total_count || 0,
+          totalPages: Math.ceil((ordersResult.rows[0]?.total_count || 0) / parsedLimit)
+        }
+      });
+    } catch (error) {
+      console.error('Get all orders error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch orders'
       });
     }
   },
@@ -348,6 +449,8 @@ const adminController = {
     try {
       const { token } = req.params;
 
+      await ensureArtworkSubmissionSourceColumn();
+
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const { artistId, action } = decoded;
@@ -362,20 +465,34 @@ const adminController = {
         `);
       }
 
-      // Update artist verification status
-      const result = await db.query(
-        `UPDATE artists SET verification_status = 'verified' WHERE id = $1 RETURNING *`,
-        [artistId]
-      );
+      const client = await db.pool.connect();
+      let result;
 
-      if (result.rows.length === 0) {
-        return res.status(404).send(`
+      try {
+        await client.query('BEGIN');
+        result = await client.query(
+          `UPDATE artists SET verification_status = 'verified' WHERE id = $1 RETURNING *`,
+          [artistId]
+        );
+
+        if (result.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).send(`
           <!DOCTYPE html>
           <html><body style="font-family: Arial; padding: 40px; text-align: center;">
             <h1 style="color: #f44336;">❌ Artist Not Found</h1>
             <p>The artist could not be found in the database.</p>
           </body></html>
         `);
+        }
+
+        await syncArtistReviewArtworks(artistId, 'verified', client);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
 
       // Get artist details to send confirmation email
@@ -430,6 +547,8 @@ const adminController = {
     try {
       const { token } = req.params;
 
+      await ensureArtworkSubmissionSourceColumn();
+
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const { artistId, action } = decoded;
@@ -444,20 +563,34 @@ const adminController = {
         `);
       }
 
-      // Update artist verification status
-      const result = await db.query(
-        `UPDATE artists SET verification_status = 'rejected' WHERE id = $1 RETURNING *`,
-        [artistId]
-      );
+      const client = await db.pool.connect();
+      let result;
 
-      if (result.rows.length === 0) {
-        return res.status(404).send(`
+      try {
+        await client.query('BEGIN');
+        result = await client.query(
+          `UPDATE artists SET verification_status = 'rejected' WHERE id = $1 RETURNING *`,
+          [artistId]
+        );
+
+        if (result.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).send(`
           <!DOCTYPE html>
           <html><body style="font-family: Arial; padding: 40px; text-align: center;">
             <h1 style="color: #f44336;">❌ Artist Not Found</h1>
             <p>The artist could not be found in the database.</p>
           </body></html>
         `);
+        }
+
+        await syncArtistReviewArtworks(artistId, 'rejected', client);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
 
       // Get artist details to send confirmation email

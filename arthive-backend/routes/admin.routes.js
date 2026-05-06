@@ -23,6 +23,9 @@ router.put("/artists/:id", adminController.updateArtistStatus);
 // Buyer management routes
 router.get("/buyers", adminController.getAllBuyers);
 
+// Order management routes
+router.get('/orders', adminController.getAllOrders);
+
 // Dashboard statistics
 router.get("/stats", adminController.getDashboardStats);
 

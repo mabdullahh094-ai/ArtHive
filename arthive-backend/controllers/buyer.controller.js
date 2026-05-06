@@ -1,5 +1,29 @@
 const db = require("../config/db");
 
+let artworkGalleryColumnEnsured = false;
+const ensureArtworkGalleryColumn = async () => {
+  if (artworkGalleryColumnEnsured) {
+    return;
+  }
+  await db.query(`
+    ALTER TABLE artworks
+    ADD COLUMN IF NOT EXISTS image_urls JSONB
+  `);
+  artworkGalleryColumnEnsured = true;
+};
+
+let artworkSubmissionSourceColumnEnsured = false;
+const ensureArtworkSubmissionSourceColumn = async () => {
+  if (artworkSubmissionSourceColumnEnsured) {
+    return;
+  }
+  await db.query(`
+    ALTER TABLE artworks
+    ADD COLUMN IF NOT EXISTS submission_source VARCHAR(32) DEFAULT 'dashboard'
+  `);
+  artworkSubmissionSourceColumnEnsured = true;
+};
+
 const buyerController = {
   // Add this method FIRST
   getCategories: async (req, res) => {
@@ -114,7 +138,7 @@ const buyerController = {
          JOIN artists a ON u.id = a.id
          WHERE u.user_type = 'artist'
            AND u.status = 'active'
-           AND (a.verification_status IS NULL OR a.verification_status <> 'rejected')
+           AND a.verification_status = 'verified'
          ORDER BY a.total_sales DESC NULLS LAST, a.total_artworks DESC NULLS LAST, u.created_at DESC
          LIMIT $1`,
         [safeLimit]
@@ -199,6 +223,7 @@ const buyerController = {
   // Public: get approved artworks for a single artist
   getPublicArtistArtworks: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const { id } = req.params;
       const { page = 1, limit = 24 } = req.query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
@@ -218,6 +243,7 @@ const buyerController = {
          FROM artworks a
          WHERE a.artist_id = $1
            AND a.status = 'approved'
+           AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'
          ORDER BY a.created_at DESC
          LIMIT $2 OFFSET $3`,
         [id, parseInt(limit, 10), offset]
@@ -245,10 +271,12 @@ const buyerController = {
   // Public: homepage stat highlights
   getHomeStats: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const artworkStats = await db.query(
         `SELECT COUNT(*)::int as curated_artworks
          FROM artworks
-         WHERE status = 'approved'`
+         WHERE status = 'approved'
+           AND COALESCE(submission_source, 'dashboard') = 'dashboard'`
       );
 
       const artistStats = await db.query(
@@ -292,6 +320,8 @@ const buyerController = {
   // Get all artworks with pagination and filters
   getArtworks: async (req, res) => {
     try {
+      await ensureArtworkGalleryColumn();
+      await ensureArtworkSubmissionSourceColumn();
       const {
         page = 1,
         limit = 12,
@@ -309,6 +339,7 @@ const buyerController = {
       let query = `
         SELECT 
           a.*,
+          COALESCE(a.image_urls, jsonb_build_array(a.image_url)) as image_urls,
           u.first_name as artist_first_name,
           u.last_name as artist_last_name,
           u.profile_pic_url as artist_profile_pic,
@@ -320,6 +351,7 @@ const buyerController = {
         JOIN users u ON ar.id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
         WHERE a.status = 'approved'
+          AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'
       `;
 
       const params = [];
@@ -401,11 +433,14 @@ const buyerController = {
   // Get single artwork by ID
   getArtworkById: async (req, res) => {
     try {
+      await ensureArtworkGalleryColumn();
+      await ensureArtworkSubmissionSourceColumn();
       const { id } = req.params;
 
       const result = await db.query(
         `SELECT 
           a.*,
+          COALESCE(a.image_urls, jsonb_build_array(a.image_url)) as image_urls,
           u.first_name as artist_first_name,
           u.last_name as artist_last_name,
           u.email as artist_email,
@@ -420,7 +455,9 @@ const buyerController = {
         JOIN artists ar ON a.artist_id = ar.id
         JOIN users u ON ar.id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
-        WHERE a.id = $1 AND a.status = 'approved'`,
+        WHERE a.id = $1
+          AND a.status = 'approved'
+          AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'`,
         [id]
       );
 
@@ -439,7 +476,9 @@ const buyerController = {
 
       // Get similar artworks
       const similarArtworks = await db.query(
-        `SELECT a.id, a.title, a.price, a.image_url, a.artist_id,
+        `SELECT a.id, a.title, a.price, a.image_url,
+          COALESCE(a.image_urls, jsonb_build_array(a.image_url)) as image_urls,
+          a.artist_id,
                 u.first_name as artist_first_name, 
                 u.last_name as artist_last_name,
                 ar.verification_status as artist_verification_status
@@ -449,6 +488,7 @@ const buyerController = {
          WHERE a.category_id = $1 
            AND a.id != $2 
            AND a.status = 'approved'
+           AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'
          ORDER BY RANDOM()
          LIMIT 4`,
         [result.rows[0].category_id, id]
@@ -482,11 +522,13 @@ const buyerController = {
   // Add item to cart
   addToCart: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const { artworkId, quantity = 1 } = req.body;
       const buyerId = req.user.id;
 
       // Check if user is a buyer
-      if (req.user.user_type !== 'buyer') {
+      const normalizedUserType = String(req.user?.user_type || '').toLowerCase();
+      if (!['buyer', 'user'].includes(normalizedUserType)) {
         return res.status(403).json({
           success: false,
           message: "Only buyers can add items to cart"
@@ -499,7 +541,8 @@ const buyerController = {
          FROM artworks a
          JOIN artists ar ON a.artist_id = ar.id
          JOIN users u ON ar.id = u.id
-         WHERE a.id = $1`,
+         WHERE a.id = $1
+           AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'`,
         [artworkId]
       );
 
@@ -710,11 +753,13 @@ const buyerController = {
   // Add to wishlist
   addToWishlist: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const { artworkId } = req.body;
       const buyerId = req.user.id;
 
       // Check if user is a buyer
-      if (req.user.user_type !== 'buyer') {
+      const normalizedUserType = String(req.user?.user_type || '').toLowerCase();
+      if (!['buyer', 'user'].includes(normalizedUserType)) {
         return res.status(403).json({
           success: false,
           message: "Only buyers can add items to wishlist"
@@ -727,7 +772,9 @@ const buyerController = {
          FROM artworks a
          JOIN artists ar ON a.artist_id = ar.id
          JOIN users u ON ar.id = u.id
-         WHERE a.id = $1 AND a.status = 'approved'`,
+         WHERE a.id = $1
+           AND a.status = 'approved'
+           AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'`,
         [artworkId]
       );
 
@@ -776,6 +823,7 @@ const buyerController = {
   // Get wishlist
   getWishlist: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const buyerId = req.user.id;
 
       const result = await db.query(
@@ -790,6 +838,7 @@ const buyerController = {
         JOIN users u ON a.artist_id = u.id
         LEFT JOIN categories c ON a.category_id = c.id
         WHERE w.buyer_id = $1
+          AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'
         ORDER BY w.added_at DESC`,
         [buyerId]
       );
@@ -843,6 +892,7 @@ const buyerController = {
   // Create order from cart
   createOrder: async (req, res) => {
     try {
+      await ensureArtworkSubmissionSourceColumn();
       const buyerId = req.user.id;
       const { shipping_address, payment_method } = req.body;
 
@@ -858,7 +908,9 @@ const buyerController = {
         `SELECT c.artwork_id, c.quantity, a.price, a.artist_id
          FROM cart c
          JOIN artworks a ON c.artwork_id = a.id
-         WHERE c.buyer_id = $1 AND a.status = 'approved'`,
+         WHERE c.buyer_id = $1
+           AND a.status = 'approved'
+           AND COALESCE(a.submission_source, 'dashboard') = 'dashboard'`,
         [buyerId]
       );
 
@@ -923,9 +975,9 @@ const buyerController = {
           // Add order items
           for (const item of orderData.items) {
             await client.query(
-              `INSERT INTO order_items (order_id, artwork_id, quantity, price_at_purchase)
-               VALUES ($1, $2, $3, $4)`,
-              [orderId, item.artwork_id, item.quantity, item.price]
+              `INSERT INTO order_items (order_id, artwork_id, quantity, price, price_at_purchase)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [orderId, item.artwork_id, item.quantity, item.price, item.price]
             );
           }
         }
@@ -972,8 +1024,8 @@ const buyerController = {
                 u.profile_pic_url as artist_profile_pic,
                 COUNT(oi.id) as item_count
          FROM orders o
-         JOIN artists ar ON o.artist_id = ar.id
-         JOIN users u ON ar.id = u.id
+         LEFT JOIN artists ar ON o.artist_id = ar.id
+         LEFT JOIN users u ON ar.id = u.id
          LEFT JOIN order_items oi ON o.id = oi.order_id
          WHERE o.buyer_id = $1
          GROUP BY o.id, u.first_name, u.last_name, u.profile_pic_url

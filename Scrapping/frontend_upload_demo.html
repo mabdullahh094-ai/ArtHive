@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Artwork Price AI Upload</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-a: #fbf7ef;
+      --bg-b: #f3ebe0;
+      --ink: #1c1a17;
+      --gold: #9b6b2f;
+      --card: #fffaf2;
+      --muted: #746b62;
+      --good: #1f7a3f;
+      --warn: #9a6a08;
+      --low: #9b2f2f;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Space Grotesk", sans-serif;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(155, 107, 47, 0.15) 0 30%, transparent 31%),
+        radial-gradient(circle at 85% 80%, rgba(28, 26, 23, 0.08) 0 22%, transparent 23%),
+        linear-gradient(135deg, var(--bg-a), var(--bg-b));
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .shell {
+      width: min(980px, 100%);
+      background: rgba(255, 250, 242, 0.88);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(155, 107, 47, 0.35);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(30, 24, 15, 0.15);
+      overflow: hidden;
+      animation: rise 500ms ease-out;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero {
+      padding: 24px 24px 12px;
+      border-bottom: 1px dashed rgba(155, 107, 47, 0.45);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(32px, 4vw, 48px);
+      letter-spacing: 0.5px;
+      line-height: 1;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 0;
+    }
+
+    .panel {
+      padding: 22px;
+    }
+
+    .panel + .panel {
+      border-left: 1px solid rgba(155, 107, 47, 0.28);
+    }
+
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .drop {
+      border: 2px dashed rgba(155, 107, 47, 0.45);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 16px;
+    }
+
+    input[type="file"], input[type="number"], input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(116, 107, 98, 0.4);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input + input { margin-top: 10px; }
+
+    .btn-row {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary { background: var(--ink); color: #fff; }
+    .secondary { background: var(--gold); color: #fff; }
+
+    .card {
+      background: #fff;
+      border: 1px solid rgba(155, 107, 47, 0.3);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .kpi {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .high { background: rgba(31, 122, 63, 0.12); color: var(--good); }
+    .medium { background: rgba(154, 106, 8, 0.12); color: var(--warn); }
+    .low { background: rgba(155, 47, 47, 0.12); color: var(--low); }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      color: #403a34;
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .panel + .panel { border-left: none; border-top: 1px solid rgba(155, 107, 47, 0.28); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <h1>Artwork Price Recommender</h1>
+      <p>Upload artwork image, get AI suggested price range, then save final override for retraining.</p>
+    </section>
+
+    <section class="grid">
+      <section class="panel">
+        <div class="label">1) Upload Artwork</div>
+        <div class="drop">
+          <input id="imageInput" type="file" accept="image/*" />
+          <div class="btn-row">
+            <button class="primary" id="predictBtn">Predict Price</button>
+          </div>
+        </div>
+
+        <div style="height: 14px"></div>
+
+        <div class="label">2) Save Manual Override</div>
+        <div class="drop">
+          <input id="finalPriceInput" type="number" placeholder="Final price in PKR" />
+          <input id="artistIdInput" type="text" placeholder="Artist ID (optional)" />
+          <input id="productIdInput" type="text" placeholder="Product ID (optional)" />
+          <input id="notesInput" type="text" placeholder="Notes (optional)" />
+          <div class="btn-row">
+            <button class="secondary" id="saveFeedbackBtn">Save Feedback</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="label">Prediction Output</div>
+        <div class="card">
+          <div class="muted">Predicted Price</div>
+          <div class="kpi" id="predPrice">PKR -</div>
+          <div class="muted" id="predRange">Range: -</div>
+          <span id="confidencePill" class="pill">Confidence: -</span>
+        </div>
+        <div class="card">
+          <div class="muted">Request ID</div>
+          <div id="requestId" style="font-size:13px; font-weight:700; overflow-wrap:anywhere;">-</div>
+        </div>
+        <div class="card">
+          <div class="muted">API Response</div>
+          <pre id="responseBox">No response yet.</pre>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:8001";
+    let latestPrediction = null;
+
+    function pkr(n) {
+      const v = Number(n || 0);
+      return `PKR ${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    }
+
+    function setResponse(data) {
+      document.getElementById("responseBox").textContent = JSON.stringify(data, null, 2);
+    }
+
+    function setConfidence(label, score) {
+      const pill = document.getElementById("confidencePill");
+      pill.className = "pill " + (label || "low");
+      pill.textContent = `Confidence: ${label || "unknown"} (${score ?? "-"})`;
+    }
+
+    async function predictPrice() {
+      const fileInput = document.getElementById("imageInput");
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("Please choose an image first.");
+        return;
+      }
+
+      const form = new FormData();
+      form.append("file", file);
+
+      const res = await fetch(`${API_BASE}/predict-price`, {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+      setResponse(data);
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Prediction failed");
+      }
+
+      latestPrediction = data;
+      document.getElementById("predPrice").textContent = pkr(data.predicted_price_pkr);
+      document.getElementById("predRange").textContent = `Range: ${pkr(data.recommended_min_price_pkr)} to ${pkr(data.recommended_max_price_pkr)}`;
+      document.getElementById("requestId").textContent = data.request_id || "-";
+      setConfidence(data.confidence_label, data.confidence_score);
+    }
+
+    async function saveFeedback() {
+      if (!latestPrediction) {
+        alert("Please predict first.");
+        return;
+      }
+
+      const finalPrice = Number(document.getElementById("finalPriceInput").value || 0);
+      if (!(finalPrice > 0)) {
+        alert("Enter valid final price.");
+        return;
+      }
+
+      const payload = {
+        request_id: latestPrediction.request_id,
+        predicted_price_pkr: latestPrediction.predicted_price_pkr,
+        final_price_pkr: finalPrice,
+        artist_id: document.getElementById("artistIdInput").value || null,
+        product_id: document.getElementById("productIdInput").value || null,
+        notes: document.getElementById("notesInput").value || null,
+      };
+
+      const res = await fetch(`${API_BASE}/feedback-price`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      setResponse(data);
+      if (!res.ok) {
+        throw new Error(data.detail || "Feedback save failed");
+      }
+
+      alert("Feedback saved for retraining.");
+    }
+
+    document.getElementById("predictBtn").addEventListener("click", async () => {
+      try { await predictPrice(); } catch (e) { alert(e.message); }
+    });
+
+    document.getElementById("saveFeedbackBtn").addEventListener("click", async () => {
+      try { await saveFeedback(); } catch (e) { alert(e.message); }
+    });
+  </script>
+</body>
+</html>

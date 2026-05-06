@@ -1,0 +1,8 @@
+{
+  "best_val_mae_pkr": 83199.6453125,
+  "train_rows": 41,
+  "val_rows": 10,
+  "epochs": 1,
+  "batch_size": 8,
+  "lr": 0.0001
+}

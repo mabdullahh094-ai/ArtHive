@@ -1,0 +1,2 @@
+timestamp_utc,request_id,predicted_price_pkr,final_price_pkr,abs_error_pkr,pct_error,artist_id,product_id,image_path,image_url,notes
+2026-05-05T04:08:26.800121+00:00,7d413b97-b489-4dde-b6ad-0737f81dd5ba,0.47,45000.0,44999.53,0.99999,artist_1,upload_demo_1,data/images/1217_bismillah.jpeg,,manual override test

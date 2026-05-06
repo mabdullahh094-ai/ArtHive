@@ -29,8 +29,6 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  CheckCircle,
-  Cancel,
   Palette,
   People,
   Shield,
@@ -48,9 +46,10 @@ const AdminPanel = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
-  const [artworks, setArtworks] = useState([]);
   const [artists, setArtists] = useState([]);
   const [buyers, setBuyers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [ordersRevenue, setOrdersRevenue] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -64,7 +63,7 @@ const AdminPanel = () => {
     {
       label: 'Total Artworks',
       value: stats?.total_artworks || 0,
-      sub: `${stats?.pending_artworks || 0} pending, ${stats?.rejected_artworks || 0} rejected`,
+      sub: `${stats?.approved_artworks || 0} public, ${stats?.rejected_artworks || 0} rejected`,
       icon: <Palette />,
       color: 'primary',
     },
@@ -107,22 +106,6 @@ const AdminPanel = () => {
     }
   }, [isAuthenticated, user, authLoading, navigate]);
 
-  // Fetch pending artworks
-  const fetchArtworks = async () => {
-    try {
-      setLoading(true);
-      const res = await adminAPI.getPendingArtworks({ page: 1, limit: 1000 });
-      if (res.data?.artworks) {
-        setArtworks(res.data.artworks);
-        console.log('Artworks fetched:', res.data.artworks.length);
-      }
-    } catch (err) {
-      console.error('Failed to fetch artworks:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Fetch pending artists
   const fetchArtists = async () => {
     try {
@@ -155,6 +138,24 @@ const AdminPanel = () => {
     }
   };
 
+  // Fetch all orders with revenue summary
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await adminAPI.getAllOrders({ page: 1, limit: 1000 });
+      if (res.data?.orders) {
+        setOrders(res.data.orders);
+      }
+      if (res.data?.revenue) {
+        setOrdersRevenue(res.data.revenue);
+      }
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch dashboard statistics
   const fetchStats = async () => {
     try {
@@ -169,16 +170,16 @@ const AdminPanel = () => {
 
   useEffect(() => {
     fetchStats();
-    fetchArtworks(); // Load initial data for first tab
+    fetchArtists();
   }, []);
 
   useEffect(() => {
     if (tab === 0) {
-      fetchArtworks();
-    } else if (tab === 1) {
       fetchArtists();
-    } else if (tab === 2) {
+    } else if (tab === 1) {
       fetchBuyers();
+    } else if (tab === 2) {
+      fetchOrders();
     }
   }, [tab]);
 
@@ -217,32 +218,14 @@ const AdminPanel = () => {
 
   const confirmAction = async () => {
     try {
-      if (tab === 0) {
-        // Artwork approval
-        const status = dialogAction === 'approve' ? 'approved' : 'rejected';
-        const res = await adminAPI.updateArtworkStatus(selectedItem.id, status);
-        if (res.data?.success) {
-          // Remove item from list
-          setArtworks(artworks.filter(a => a.id !== selectedItem.id));
-          // Refresh stats to update counts
-          fetchStats();
-          console.log(`Artwork ${status} successfully`);
-        } else {
-          throw new Error('Failed to update artwork status');
-        }
+      const verification_status = dialogAction === 'approve' ? 'verified' : 'rejected';
+      const res = await adminAPI.updateArtistStatus(selectedItem.id, verification_status);
+      if (res.data?.success) {
+        setArtists(artists.filter(a => a.id !== selectedItem.id));
+        fetchStats();
+        console.log(`Artist ${verification_status} successfully`);
       } else {
-        // Artist approval
-        const verification_status = dialogAction === 'approve' ? 'verified' : 'rejected';
-        const res = await adminAPI.updateArtistStatus(selectedItem.id, verification_status);
-        if (res.data?.success) {
-          // Remove item from list
-          setArtists(artists.filter(a => a.id !== selectedItem.id));
-          // Refresh stats to update counts
-          fetchStats();
-          console.log(`Artist ${verification_status} successfully`);
-        } else {
-          throw new Error('Failed to update artist status');
-        }
+        throw new Error('Failed to update artist status');
       }
       setDialogOpen(false);
       setSelectedItem(null);
@@ -258,22 +241,6 @@ const AdminPanel = () => {
     let headers = [];
 
     if (tab === 0) {
-      // Artworks
-      if (artworks.length === 0) {
-        alert('No artworks to export. Please wait for data to load or check if there are pending artworks.');
-        return;
-      }
-      headers = ['ID', 'Title', 'Artist', 'Description', 'Price', 'Status', 'Date'];
-      data = artworks.map(a => [
-        a.id,
-        a.title,
-        `${a.artist_first_name} ${a.artist_last_name}`,
-        a.description || '',
-        a.price || '',
-        a.status || 'pending',
-        new Date(a.created_at).toLocaleDateString(),
-      ]);
-    } else if (tab === 1) {
       // Artists
       if (artists.length === 0) {
         alert('No artists to export. Please wait for data to load or check if there are pending artists.');
@@ -291,7 +258,7 @@ const AdminPanel = () => {
         a.verification_status || 'pending',
         new Date(a.signup_date).toLocaleDateString(),
       ]);
-    } else if (tab === 2) {
+    } else if (tab === 1) {
       // Buyers
       if (buyers.length === 0) {
         alert('No buyers to export. Please wait for data to load or check if there are registered buyers.');
@@ -304,6 +271,23 @@ const AdminPanel = () => {
         b.email,
         b.status || 'active',
         new Date(b.created_at).toLocaleDateString(),
+      ]);
+    } else if (tab === 2) {
+      // Orders
+      if (orders.length === 0) {
+        alert('No orders to export yet.');
+        return;
+      }
+      headers = ['Order ID', 'Order Number', 'Buyer', 'Email', 'Amount', 'Status', 'Tracking Number', 'Created Date'];
+      data = orders.map(o => [
+        o.id,
+        o.order_number || '',
+        `${o.buyer_first_name || ''} ${o.buyer_last_name || ''}`.trim(),
+        o.buyer_email || '',
+        o.total_amount,
+        o.status || '',
+        o.tracking_number || '',
+        new Date(o.created_at).toLocaleDateString(),
       ]);
     }
 
@@ -332,7 +316,7 @@ const AdminPanel = () => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
-    const tabName = tab === 0 ? 'Artworks' : tab === 1 ? 'Artists' : 'Buyers';
+    const tabName = tab === 0 ? 'Artists' : 'Buyers';
     const fileName = `${tabName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`;
     
     link.setAttribute('href', url);
@@ -368,7 +352,7 @@ const AdminPanel = () => {
               Admin Dashboard
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              Approve artists, review artworks, and keep the marketplace healthy.
+              Approve artists, review their submitted artworks, and keep the marketplace healthy.
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
@@ -419,89 +403,14 @@ const AdminPanel = () => {
         {/* Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={tab} onChange={(e, newVal) => setTab(newVal)} variant="scrollable" allowScrollButtonsMobile>
-            <Tab label="Pending Artworks" />
             <Tab label="Pending Artists" />
             <Tab label="All Buyers" />
+            <Tab label="Orders & Revenue" />
           </Tabs>
         </Box>
 
-        {/* Artworks Tab */}
-        {tab === 0 && (
-          <>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                <CircularProgress />
-              </Box>
-            ) : artworks.length === 0 ? (
-              <Alert severity="success">No pending artworks. All submissions have been reviewed!</Alert>
-            ) : (
-              <Grid container spacing={{ xs: 2, sm: 3 }}>
-                {artworks.map((artwork) => (
-                  <Grid item xs={12} sm={6} md={4} key={artwork.id}>
-                    <Card>
-                      {artwork.image_url && (
-                        <CardMedia
-                          component="img"
-                          height={isMobile ? '190' : '220'}
-                          image={artwork.image_url}
-                          alt={artwork.title}
-                          sx={{
-                            height: { xs: 190, sm: 220 },
-                            objectFit: 'cover',
-                            backgroundColor: '#f5f5f5',
-                          }}
-                        />
-                      )}
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          {artwork.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          by {artwork.artist_first_name} {artwork.artist_last_name}
-                        </Typography>
-                        {artwork.description && (
-                          <Typography variant="body2" sx={{ mb: 2 }}>
-                            {artwork.description}
-                          </Typography>
-                        )}
-                        {artwork.price && (
-                          <Typography variant="h6" color="primary">
-                            ${artwork.price}
-                          </Typography>
-                        )}
-                        <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            size="small"
-                            startIcon={<CheckCircle />}
-                            onClick={() => handleApprove(artwork)}
-                            fullWidth
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            variant="contained"
-                            color="error"
-                            size="small"
-                            startIcon={<Cancel />}
-                            onClick={() => handleReject(artwork)}
-                            fullWidth
-                          >
-                            Reject
-                          </Button>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
-          </>
-        )}
-
         {/* Artists Tab */}
-        {tab === 1 && (
+        {tab === 0 && (
           <>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -582,7 +491,7 @@ const AdminPanel = () => {
         )}
 
         {/* Buyers Tab */}
-        {tab === 2 && (
+        {tab === 1 && (
           <>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -634,6 +543,93 @@ const AdminPanel = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            )}
+          </>
+        )}
+
+        {/* Orders & Revenue Tab */}
+        {tab === 2 && (
+          <>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="caption" color="text.secondary">Total Orders</Typography>
+                        <Typography variant="h6" fontWeight={800}>{ordersRevenue?.total_orders || 0}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="caption" color="text.secondary">Completed Orders</Typography>
+                        <Typography variant="h6" fontWeight={800}>{ordersRevenue?.completed_orders || 0}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="caption" color="text.secondary">Gross Revenue</Typography>
+                        <Typography variant="h6" fontWeight={800}>${ordersRevenue?.gross_revenue || '0.00'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="caption" color="text.secondary">Completed Revenue</Typography>
+                        <Typography variant="h6" fontWeight={800}>${ordersRevenue?.completed_revenue || '0.00'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {orders.length === 0 ? (
+                  <Alert severity="info">No orders found yet.</Alert>
+                ) : (
+                  <TableContainer sx={{ overflowX: 'auto' }}>
+                    <Table size={isMobile ? 'small' : 'medium'} sx={{ minWidth: 900 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Order #</TableCell>
+                          <TableCell>Buyer</TableCell>
+                          <TableCell>Email</TableCell>
+                          <TableCell>Amount</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Tracking</TableCell>
+                          <TableCell>Date</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {orders.map((order) => (
+                          <TableRow key={order.id}>
+                            <TableCell>{order.order_number || `#${order.id}`}</TableCell>
+                            <TableCell>{`${order.buyer_first_name || ''} ${order.buyer_last_name || ''}`.trim()}</TableCell>
+                            <TableCell>{order.buyer_email}</TableCell>
+                            <TableCell>${Number(order.total_amount || 0).toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={order.status || 'unknown'}
+                                size="small"
+                                color={order.status === 'completed' ? 'success' : order.status === 'failed' ? 'error' : 'default'}
+                              />
+                            </TableCell>
+                            <TableCell>{order.tracking_number || 'N/A'}</TableCell>
+                            <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </>
             )}
           </>
         )}
@@ -778,7 +774,7 @@ const AdminPanel = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to {dialogAction} this {tab === 0 ? 'artwork' : 'artist'}?
+            Are you sure you want to {dialogAction} this artist?
           </Typography>
         </DialogContent>
         <DialogActions>

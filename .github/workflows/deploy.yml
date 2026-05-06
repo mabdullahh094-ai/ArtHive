@@ -1,0 +1,123 @@
+name: Deploy ArtHive
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-arthive
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Build React frontend ────────────────────────────────────────────
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: arthive-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: arthive-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: arthive-frontend
+        env:
+          # All API calls go through /api/ which nginx proxies to the backend
+          REACT_APP_API_URL: /api
+          # Suppress CRA warnings-as-errors so the build never fails on lint
+          CI: "false"
+        run: npm run build
+
+      # ── 3. Package as tarball (skip heavy dirs) ────────────────────────────
+      - name: Create deployment tarball
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.venv' \
+            --exclude='arthive-frontend/node_modules' \
+            --exclude='arthive-backend/node_modules' \
+            --exclude='arthive-backend/venv' \
+            --exclude='arthive-backend/.venv' \
+            --exclude='arthive-backend/arthive-deploy.tar.gz' \
+            --exclude='*.pem' \
+            -czf arthive-deploy.tar.gz .
+          echo "Tarball size: $(du -sh arthive-deploy.tar.gz | cut -f1)"
+
+      # ── 4. SCP tarball to server ───────────────────────────────────────────
+      - name: Upload tarball to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          source: "arthive-deploy.tar.gz"
+          target: "/tmp/"
+
+      # ── 5. Remote deployment ───────────────────────────────────────────────
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          # Give large uploads time to finish building
+          command_timeout: "20m"
+          script: |
+            set -e
+
+            DEPLOY_DIR=/var/www/arthive
+
+            echo "==> Preparing deploy directory: $DEPLOY_DIR"
+            sudo mkdir -p "$DEPLOY_DIR"
+            sudo chown "$(whoami)":"$(whoami)" "$DEPLOY_DIR"
+
+            echo "==> Extracting tarball"
+            tar -xzf /tmp/arthive-deploy.tar.gz -C "$DEPLOY_DIR"
+            rm -f /tmp/arthive-deploy.tar.gz
+
+            echo "==> Verifying required .env"
+            if [ ! -f "$DEPLOY_DIR/arthive-backend/.env" ]; then
+              echo "ERROR: $DEPLOY_DIR/arthive-backend/.env is missing on the server!" >&2
+              echo "Create it manually before the first deploy (see arthive-backend/.env.example)." >&2
+              exit 1
+            fi
+
+            echo "==> Creating persistent directories"
+            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/artist_portfolio"
+            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/profile_pics"
+            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/temp_predictions"
+            # Model file must be placed manually at this path ONCE:
+            # /var/www/arthive/models/image_price_regressor_feedback_v2/best_model.pt
+            mkdir -p "$DEPLOY_DIR/models/image_price_regressor_feedback_v2"
+
+            echo "==> Restarting Docker services"
+            cd "$DEPLOY_DIR"
+            docker compose down --remove-orphans || true
+            docker compose up -d --build
+
+            echo "==> Configuring nginx"
+            sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
+            sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
+            # Remove default site if it exists so it doesn't conflict
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            echo ""
+            echo "✅  Deployment complete!"
+            echo "    Site: https://art-hive.tech"

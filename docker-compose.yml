@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./arthive-backend
+    env_file:
+      - ./arthive-backend/.env
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      MODEL_DIR: /models/image_price_regressor_feedback_v2
+      CORS_ORIGINS: http://localhost,http://127.0.0.1
+    volumes:
+      - arthive_uploads:/app/uploads
+      - ./models:/models:ro
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./arthive-frontend
+      args:
+        REACT_APP_API_URL: /api
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  arthive_uploads:

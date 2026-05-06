@@ -34,7 +34,8 @@ const authMiddleware = {
 
   // Check if user is buyer
   isBuyer: (req, res, next) => {
-    if (req.user.user_type !== "buyer") {
+    const normalizedUserType = String(req.user?.user_type || "").toLowerCase();
+    if (!["buyer", "user"].includes(normalizedUserType)) {
       return res.status(403).json({
         success: false,
         message: "Access denied. Buyer only."
@@ -45,7 +46,8 @@ const authMiddleware = {
 
   // Check if user is artist
   isArtist: (req, res, next) => {
-    if (req.user.user_type !== "artist") {
+    const normalizedUserType = String(req.user?.user_type || "").toLowerCase();
+    if (normalizedUserType !== "artist") {
       return res.status(403).json({
         success: false,
         message: "Access denied. Artist only."
@@ -56,7 +58,8 @@ const authMiddleware = {
 
   // Check if user is admin
   isAdmin: (req, res, next) => {
-    if (req.user.user_type !== "admin") {
+    const normalizedUserType = String(req.user?.user_type || "").toLowerCase();
+    if (normalizedUserType !== "admin") {
       return res.status(403).json({
         success: false,
         message: "Access denied. Admin only."

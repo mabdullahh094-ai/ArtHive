@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { authAPI } from '../../services/api';
+import { normalizeEmailInput, toTitleCaseInput } from '../../utils/formatters';
 
 const Profile = () => {
   const { user, isAuthenticated } = useAuth();
@@ -124,7 +125,17 @@ const Profile = () => {
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unnamed User';
 
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    let nextValue = value;
+
+    if (field === 'contact_email') {
+      nextValue = normalizeEmailInput(value);
+    }
+
+    if (['first_name', 'last_name', 'city', 'country', 'address'].includes(field)) {
+      nextValue = toTitleCaseInput(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handleEditToggle = () => {
@@ -200,12 +211,21 @@ const Profile = () => {
 
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
-      <Typography variant="h4" fontWeight={700} gutterBottom>
-        My Account
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        View and edit your account details.
-      </Typography>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5} sx={{ mb: 3 }}>
+        <Box>
+          <Typography variant="h4" fontWeight={700} gutterBottom>
+            My Account
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            View and edit your account details.
+          </Typography>
+        </Box>
+        {profile.user_type === 'buyer' && (
+          <Button variant="outlined" onClick={() => navigate('/orders')}>
+            View My Orders
+          </Button>
+        )}
+      </Stack>
 
       <Card sx={{ mb: 3 }}>
         <CardHeader

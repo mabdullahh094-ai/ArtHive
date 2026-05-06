@@ -34,6 +34,7 @@ const Wishlist = () => {
   const { addToCart, wishlistItems, removeFromWishlist, loading: cartLoading } = useCart();
   const navigate = useNavigate();
   const notification = useNotification();
+  const canAddToCart = !!user && ['buyer', 'user'].includes(user?.user_type);
 
   useEffect(() => {
     // Wait until auth state is known before redirecting
@@ -58,6 +59,11 @@ const Wishlist = () => {
   };
 
   const handleMoveToCart = async (artwork) => {
+    if (!canAddToCart) {
+      notification.showWarning('Only buyers can add items to cart');
+      return;
+    }
+
     try {
       await addToCart(artwork.artworkId || artwork.id, 1);
       await removeFromWishlist(artwork.artworkId || artwork.id);
@@ -152,10 +158,11 @@ const Wishlist = () => {
                 <Button
                   variant="contained"
                   startIcon={<CartIcon />}
+                  disabled={!canAddToCart}
                   onClick={handleAddSelectedToCart}
                   sx={{ whiteSpace: 'nowrap' }}
                 >
-                  Add Selected to Cart
+                  {canAddToCart ? 'Add Selected to Cart' : 'Buyers Only'}
                 </Button>
               )}
               <Button
@@ -206,18 +213,18 @@ const Wishlist = () => {
                   onChange={() => handleSelectItem(itemId)}
                   sx={{ flexShrink: 0 }}
                 />
-                <Card sx={{ display: 'flex', flexDirection: 'row', minHeight: { xs: 108, sm: 170 }, overflow: 'hidden', flex: 1 }}>
+                <Card sx={{ display: 'flex', flexDirection: 'row', minHeight: { xs: 96, sm: 142 }, overflow: 'hidden', flex: 1 }}>
                   {/* Artwork Image */}
                   <CardMedia
                     component="img"
-                    sx={{ width: { xs: 82, sm: 170 }, height: { xs: 108, sm: 'auto' }, cursor: 'pointer', flexShrink: 0 }}
+                    sx={{ width: { xs: 72, sm: 136 }, height: { xs: 96, sm: 'auto' }, cursor: 'pointer', flexShrink: 0 }}
                     image={item.image}
                     alt={item.title}
                     onClick={() => navigate(`/artwork/${item.artworkId}`)}
                   />
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                  <CardContent sx={{ flex: '1 0 auto', p: { xs: 0.75, sm: 1.5 }, pb: { xs: 0.4, sm: 0.75 } }}>
+                  <CardContent sx={{ flex: '1 0 auto', p: { xs: 0.6, sm: 1.1 }, pb: { xs: 0.2, sm: 0.45 } }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: { xs: 0.5, sm: 0 } }}>
                       <Box sx={{ minWidth: 0, pr: 0.5 }}>
                         <Typography
@@ -229,7 +236,7 @@ const Wishlist = () => {
                             color: 'inherit',
                             '&:hover': { color: 'primary.main' },
                             fontWeight: 700,
-                            fontSize: { xs: '0.86rem', sm: '1rem' },
+                            fontSize: { xs: '0.8rem', sm: '0.92rem' },
                             lineHeight: 1.2,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -251,33 +258,41 @@ const Wishlist = () => {
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             display: 'block',
-                            fontSize: { xs: '0.78rem', sm: '0.875rem' },
+                            fontSize: { xs: '0.72rem', sm: '0.8rem' },
                           }}
                         >
                           {item.artist?.name || item.artist}
                         </Typography>
                         
-                        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.45, mb: 0.45, flexWrap: 'wrap' }}>
-                          <Chip label={item.category} size="small" />
-                          <Chip label={item.medium} size="small" variant="outlined" sx={{ display: { xs: 'none', sm: 'inline-flex' } }} />
-                        </Box>
+                        {(item.category || item.medium) && (
+                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.35, mb: 0.3, flexWrap: 'wrap' }}>
+                            {item.category && (
+                              <Chip label={item.category} size="small" sx={{ height: 20, '& .MuiChip-label': { px: 0.8, fontSize: '0.64rem' } }} />
+                            )}
+                            {item.medium && (
+                              <Chip label={item.medium} size="small" variant="outlined" sx={{ display: { xs: 'none', sm: 'inline-flex' }, height: 20, '& .MuiChip-label': { px: 0.8, fontSize: '0.64rem' } }} />
+                            )}
+                          </Box>
+                        )}
                         
-                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.72rem', sm: '0.875rem' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.year} • {item.dimensions}
-                        </Typography>
+                        {([item.year, item.dimensions].filter(Boolean).length > 0) && (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.66rem', sm: '0.78rem' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {[item.year, item.dimensions].filter(Boolean).join(' • ')}
+                          </Typography>
+                        )}
                       </Box>
                       
-                      <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 700, fontSize: { xs: '0.98rem', sm: '1rem' }, lineHeight: 1, whiteSpace: 'nowrap' }}>
+                      <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 700, fontSize: { xs: '0.86rem', sm: '0.92rem' }, lineHeight: 1, whiteSpace: 'nowrap' }}>
                         ${item.price.toLocaleString()}
                       </Typography>
                     </Box>
                     
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2, fontSize: { xs: '0.66rem', sm: '0.75rem' } }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.1, fontSize: { xs: '0.62rem', sm: '0.7rem' } }}>
                       Added on {new Date(item.addedDate).toLocaleDateString()}
                     </Typography>
                   </CardContent>
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: { xs: 0.75, sm: 1.5 }, pt: 0, flexDirection: 'row', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: { xs: 0.6, sm: 1.1 }, pt: 0, flexDirection: 'row', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
                     <Box sx={{ flexShrink: 0, display: { xs: 'none', sm: 'flex' } }}>
                       <IconButton
                         aria-label="view artwork"
@@ -301,6 +316,7 @@ const Wishlist = () => {
                     <Button
                       variant="contained"
                       startIcon={<CartIcon />}
+                      disabled={!canAddToCart}
                       onClick={() => handleMoveToCart(item)}
                       sx={{
                         ml: 'auto',
@@ -309,33 +325,15 @@ const Wishlist = () => {
                         px: { xs: 0.75, sm: 1.5 },
                         whiteSpace: 'nowrap',
                         flexShrink: 1,
-                        fontSize: { xs: '0.7rem', sm: '0.8125rem' },
+                        fontSize: { xs: '0.64rem', sm: '0.76rem' },
                         '& .MuiButton-startIcon': { mr: { xs: 0.35, sm: 1 }, ml: 0 },
                         display: { xs: 'none', sm: 'inline-flex' },
                       }}
                       size="small"
                     >
-                      Move to Cart
+                      {canAddToCart ? 'Move to Cart' : 'Buyers Only'}
                     </Button>
 
-                    <Box sx={{ display: { xs: 'flex', sm: 'none' }, gap: 0.5, ml: 'auto' }}>
-                      <IconButton
-                        aria-label="view artwork"
-                        onClick={() => navigate(`/artwork/${item.artworkId}`)}
-                        size="small"
-                      >
-                        <ViewIcon />
-                      </IconButton>
-
-                      <IconButton
-                        aria-label="remove from wishlist"
-                        onClick={() => handleRemoveFromWishlist(item.artworkId || item.id)}
-                        color="error"
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
                   </Box>
                 </Box>
               </Card>

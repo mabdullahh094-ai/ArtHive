@@ -13,10 +13,9 @@ import {
   MenuItem,
   Pagination,
   Select,
-  TextField,
   Typography,
 } from '@mui/material';
-import { Favorite, FavoriteBorder, Search } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, FilterList } from '@mui/icons-material';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -30,6 +29,10 @@ const CATEGORY_OPTIONS = [
   { label: 'Photography', value: 'photography' },
   { label: 'Sculpture', value: 'sculpture' },
   { label: 'Digital Art', value: 'digital' },
+  { label: 'Mixed Media', value: 'mixed-media' },
+  { label: 'Drawing', value: 'drawing' },
+  { label: 'Printmaking', value: 'printmaking' },
+  { label: 'Textile Art', value: 'textile-art' },
 ];
 
 const ArtworkGallery = () => {
@@ -38,23 +41,46 @@ const ArtworkGallery = () => {
   const categoryParam = searchParams.get('category') || 'all';
   const pageParam = Number(searchParams.get('page') || 1);
 
-  const [searchQuery, setSearchQuery] = useState(searchParam);
   const [filter, setFilter] = useState(categoryParam);
   const [page, setPage] = useState(pageParam);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [artworks, setArtworks] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
   const notification = useNotification();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { addToWishlist, removeFromWishlist, wishlistItems, addToCart } = useCart();
+  const canAddToCart = isAuthenticated && ['buyer', 'user'].includes(user?.user_type);
 
   useEffect(() => {
-    setSearchQuery(searchParam);
     setFilter(categoryParam || 'all');
     setPage(pageParam || 1);
   }, [searchParam, categoryParam, pageParam]);
+
+  useEffect(() => {
+    if (!isCategoryOpen) return undefined;
+
+    const isCategoryMenuElement = (target) =>
+      target instanceof Element &&
+      Boolean(target.closest('[data-category-menu="true"], [data-category-menu-paper="true"]'));
+
+    const closeCategoryMenu = (event) => {
+      if (isCategoryMenuElement(event.target)) return;
+      setIsCategoryOpen(false);
+    };
+
+    window.addEventListener('scroll', closeCategoryMenu, true);
+    window.addEventListener('touchmove', closeCategoryMenu, { passive: true, capture: true });
+    window.addEventListener('wheel', closeCategoryMenu, { passive: true, capture: true });
+
+    return () => {
+      window.removeEventListener('scroll', closeCategoryMenu, true);
+      window.removeEventListener('touchmove', closeCategoryMenu, true);
+      window.removeEventListener('wheel', closeCategoryMenu, true);
+    };
+  }, [isCategoryOpen]);
 
   const updateParams = ({ search, category, page: nextPage }) => {
     const params = new URLSearchParams();
@@ -91,20 +117,14 @@ const ArtworkGallery = () => {
     fetchArtworks();
   }, [fetchArtworks]);
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    const trimmed = searchQuery.trim();
-    updateParams({ search: trimmed, category: filter, page: 1 });
-  };
-
   const handleFilterChange = (value) => {
     setFilter(value);
-    updateParams({ search: searchQuery.trim(), category: value, page: 1 });
+    updateParams({ search: searchParam, category: value, page: 1 });
   };
 
   const handlePageChange = (_, value) => {
     setPage(value);
-    updateParams({ search: searchQuery.trim(), category: filter, page: value });
+    updateParams({ search: searchParam, category: filter, page: value });
   };
 
   const handleWishlistClick = async (artwork) => {
@@ -141,6 +161,11 @@ const ArtworkGallery = () => {
       return;
     }
 
+    if (!canAddToCart) {
+      notification.showWarning('Only buyers can add items to cart');
+      return;
+    }
+
     try {
       const result = await addToCart(artwork);
       if (result?.success) notification.showSuccess('Added to cart');
@@ -153,49 +178,44 @@ const ArtworkGallery = () => {
 
   return (
     <Container maxWidth="lg">
-      <Box sx={{ mb: 4, mt: { xs: 2, sm: 4 } }} component="form" onSubmit={handleSearchSubmit}>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'stretch',
-            gap: { xs: 1, sm: 1.5 },
-            mb: 3,
-          }}
-        >
-          <TextField
-            fullWidth
-            placeholder="Search artworks or artists..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              flex: '1 1 0',
-              minWidth: 0,
-              '& .MuiInputBase-root': {
-                height: { xs: 42, sm: 48 },
-                fontSize: { xs: '0.95rem', sm: '1rem' },
-              },
-            }}
-            InputProps={{
-              startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
-            }}
-          />
-          <FormControl
-            sx={{
-              flex: { xs: '0 0 36%', sm: '0 0 210px' },
-              minWidth: { xs: 110, sm: 160 },
-              '& .MuiInputBase-root': {
-                height: { xs: 42, sm: 48 },
-                fontSize: { xs: '0.95rem', sm: '1rem' },
-              },
-            }}
-          >
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' }, gap: 2, mb: 4, backgroundColor: 'white', p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: 2, border: '1px solid rgba(15,23,42,0.06)' }}>
+        <Typography variant="h6" component="h2" sx={{ order: { xs: 2, md: 1 } }}>
+          Featured Artworks
+        </Typography>
+
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', order: { xs: 1, md: 2 } }}>
+          <FilterList />
+          <FormControl sx={{ minWidth: 150 }}>
             <Select
               value={filter}
-              displayEmpty
               onChange={(e) => handleFilterChange(e.target.value)}
+              open={isCategoryOpen}
+              onOpen={() => setIsCategoryOpen(true)}
+              onClose={() => setIsCategoryOpen(false)}
+              MenuProps={{
+                keepMounted: false,
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                },
+                transformOrigin: {
+                  vertical: 'top',
+                  horizontal: 'left',
+                },
+                MenuListProps: {
+                  'data-category-menu': 'true',
+                },
+                PaperProps: {
+                  'data-category-menu-paper': 'true',
+                  sx: {
+                    maxHeight: 300,
+                    mt: 0.5,
+                  },
+                },
+              }}
             >
-              {CATEGORY_OPTIONS.map((option) => (
+              <MenuItem value="all">All Categories</MenuItem>
+              {CATEGORY_OPTIONS.filter((option) => option.value !== 'all').map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>
@@ -222,7 +242,7 @@ const ArtworkGallery = () => {
           </Typography>
         </Box>
       ) : (
-        <Grid container spacing={{ xs: 2, md: 4 }}>
+        <Grid container spacing={{ xs: 1, sm: 1.25, md: 1.5 }}>
           {artworks.map((artwork) => {
             const isWishlisted = wishlistItems.some(
               (item) => item.artworkId === artwork.id || item.id === artwork.id
@@ -235,7 +255,7 @@ const ArtworkGallery = () => {
             const image = artwork.image_url || artwork.imageUrl || 'https://via.placeholder.com/400x300?text=No+Image';
 
             return (
-              <Grid item xs={6} sm={6} md={3} key={artwork.id}>
+              <Grid item xs={6} sm={4} md={3} lg={2} key={artwork.id}>
                 <Card
                   sx={{
                     position: 'relative',
@@ -243,7 +263,9 @@ const ArtworkGallery = () => {
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderRadius: { xs: 2.5, sm: 3 },
+                    borderRadius: 1.5,
+                    border: '1px solid rgba(15,23,42,0.1)',
+                    overflow: 'hidden',
                     '&:hover': {
                       transform: 'translateY(-8px)',
                       boxShadow: 6,
@@ -253,10 +275,10 @@ const ArtworkGallery = () => {
                   <IconButton
                     sx={{
                       position: 'absolute',
-                      top: { xs: 6, sm: 8 },
-                      right: { xs: 6, sm: 8 },
+                      top: { xs: 5, sm: 7 },
+                      right: { xs: 5, sm: 7 },
                       backgroundColor: 'white',
-                      p: { xs: 0.75, sm: 1 },
+                      p: { xs: 0.55, sm: 0.8 },
                       zIndex: 1,
                       '&:hover': { backgroundColor: 'white' },
                     }}
@@ -272,14 +294,14 @@ const ArtworkGallery = () => {
                       image={image}
                       alt={artwork.title}
                       sx={{
-                        height: { xs: 135, sm: 200 },
+                        height: { xs: 120, sm: 155, md: 170 },
                         objectFit: 'cover',
                         backgroundColor: '#f5f5f5',
                       }}
                       onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400x300?text=No+Image'; }}
                     />
-                    <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2 }, '&:last-child': { pb: { xs: 1.5, sm: 2 } } }}>
-                      <Typography gutterBottom variant="h6" noWrap sx={{ fontSize: { xs: '1.05rem', sm: '1.25rem' }, mb: { xs: 0.4, sm: 1 } }}>
+                    <CardContent sx={{ flexGrow: 1, p: { xs: 1, sm: 1.4 }, '&:last-child': { pb: { xs: 1, sm: 1.4 } } }}>
+                      <Typography gutterBottom variant="h6" noWrap sx={{ fontSize: { xs: '0.92rem', sm: '1.05rem' }, mb: { xs: 0.25, sm: 0.5 } }}>
                         {artwork.title}
                       </Typography>
                       <Typography
@@ -287,26 +309,27 @@ const ArtworkGallery = () => {
                         color="text.secondary"
                         noWrap
                         title={artistName}
-                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                        sx={{ fontSize: { xs: '0.68rem', sm: '0.8rem' } }}
                       >
                         By {artistName}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: { xs: 0.5, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' } }} noWrap>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: { xs: 0.35, sm: 0.6 }, fontSize: { xs: '0.66rem', sm: '0.78rem' } }} noWrap>
                         {mediumLabel}
                       </Typography>
-                      <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '0.95rem', sm: '1.25rem' } }}>
+                      <Typography variant="h6" color="primary" sx={{ fontSize: { xs: '0.84rem', sm: '1rem' }, fontWeight: 800 }}>
                         ${artwork.price ? artwork.price.toLocaleString() : 'N/A'}
                       </Typography>
                       <Button
                         fullWidth
                         variant="contained"
-                        sx={{ mt: { xs: 1.25, sm: 2 }, py: { xs: 0.8, sm: 1 }, fontSize: { xs: '0.72rem', sm: '0.875rem' }, whiteSpace: 'nowrap' }}
+                        sx={{ mt: { xs: 0.9, sm: 1.3 }, py: { xs: 0.58, sm: 0.75 }, fontSize: { xs: '0.66rem', sm: '0.78rem' }, whiteSpace: 'nowrap', borderRadius: 1.5 }}
+                        disabled={!canAddToCart || artwork.isSold}
                         onClick={(e) => {
                           e.preventDefault();
                           handleAddToCart(artwork);
                         }}
                       >
-                        Add to Cart
+                        {artwork.isSold ? 'Sold Out' : canAddToCart ? 'Add to Cart' : 'Buyers Only'}
                       </Button>
                     </CardContent>
                   </Link>
