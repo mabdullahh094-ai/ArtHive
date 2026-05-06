@@ -7,19 +7,6 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Determine which python executable to use
-const getPythonExecutable = () => {
-  // Try venv first (if deployed to /var/www/arthive)
-  const venvPython = '/var/www/arthive/venv/bin/python3';
-  if (fs.existsSync(venvPython)) {
-    return venvPython;
-  }
-  // Fall back to system python
-  return 'python3';
-};
-
-const PYTHON_EXECUTABLE = getPythonExecutable();
-
 // Path to Python scripts
 const PREDICT_SCRIPT = path.join(__dirname, '../ml_models/predict_price.py');
 const ANALYZE_IMAGE_SCRIPT = path.join(__dirname, '../ml_models/analyze_image.py');
@@ -97,7 +84,7 @@ const analyzeImage = async (req, res) => {
 function callPythonImageAnalyzer(imagePath) {
   return new Promise((resolve, reject) => {
     try {
-      const pythonProcess = spawn(PYTHON_EXECUTABLE, [ANALYZE_IMAGE_SCRIPT, imagePath]);
+      const pythonProcess = spawn('python3', [ANALYZE_IMAGE_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
@@ -243,7 +230,7 @@ function callPythonPredictorImage(imagePath) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process with image path as argument
-      const pythonProcess = spawn('python', [PREDICT_SCRIPT, imagePath]);
+      const pythonProcess = spawn('python3', [PREDICT_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
