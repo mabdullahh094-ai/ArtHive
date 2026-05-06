@@ -306,7 +306,7 @@ function callPythonPredictor(features) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process
-      const pythonProcess = spawn('python', [PREDICT_SCRIPT]);
+      const pythonProcess = spawn('python3', [PREDICT_SCRIPT]);
 
       let outputData = '';
       let errorData = '';
@@ -389,7 +389,7 @@ with contextlib.redirect_stdout(io.StringIO()):
 print(json.dumps(result))
 `;
 
-  const pythonProcess = spawn('python', ['-c', pythonCode, JSON.stringify(features)]);
+  const pythonProcess = spawn('python3', ['-c', pythonCode, JSON.stringify(features)]);
     let outputData = '';
 
     pythonProcess.stdout.on('data', (data) => {
