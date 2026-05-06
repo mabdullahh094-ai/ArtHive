@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_HOST: 51.21.111.113
-      DEPLOY_USER: arthive
+      DEPLOY_USER: ubuntu
       DEPLOY_DIR: /var/www/arthive
 
     steps:
@@ -171,6 +171,25 @@ jobs:
             echo "  ❌ Frontend (port 3000): FAILED"
           fi
 
+          # Check Nginx
+          echo ""
+          echo "🌐 Checking Nginx..."
+          if sudo systemctl is-active --quiet nginx; then
+            echo "  ✅ Nginx: RUNNING"
+            # Verify Nginx config
+            if sudo nginx -t 2>&1 | grep -q "successful"; then
+              echo "  ✅ Nginx config: VALID"
+              # Reload Nginx to apply any changes
+              sudo systemctl reload nginx
+              echo "  ✅ Nginx reloaded"
+            else
+              echo "  ⚠️  Nginx config may have issues"
+              sudo nginx -t
+            fi
+          else
+            echo "  ⚠️  Nginx: NOT RUNNING (frontend may not be accessible via reverse proxy)"
+          fi
+
           echo ""
           echo "========================================"
           echo "✅ Deployment Complete!"
@@ -220,8 +239,14 @@ jobs:
           echo "  Deploy Directory: ${{ env.DEPLOY_DIR }}"
           echo ""
           echo "🌐 Access Your Application:"
-          echo "  Frontend: http://${{ env.DEPLOY_HOST }}:3000"
-          echo "  Backend API: http://${{ env.DEPLOY_HOST }}:3001"
+          echo ""
+          echo "  📱 Via Nginx (Recommended):"
+          echo "    http://${{ env.DEPLOY_HOST }}"
+          echo "    (Nginx acts as reverse proxy for both frontend & backend)"
+          echo ""
+          echo "  📱 Direct Access (if needed):"
+          echo "    Frontend: http://${{ env.DEPLOY_HOST }}:3000"
+          echo "    Backend API: http://${{ env.DEPLOY_HOST }}:3001"
           echo ""
           echo "📝 Useful Commands:"
           echo "  Check backend logs:"
@@ -230,10 +255,16 @@ jobs:
           echo "  Check frontend logs:"
           echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo journalctl -u arthive-frontend -f'"
           echo ""
+          echo "  Check Nginx:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl status nginx'"
+          echo ""
           echo "  Restart services:"
           echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl restart arthive-backend arthive-frontend'"
           echo ""
+          echo "  Reload Nginx:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl reload nginx'"
+          echo ""
           echo "  View service status:"
-          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl status arthive-backend arthive-frontend'"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl status arthive-backend arthive-frontend nginx'"
           echo ""
 

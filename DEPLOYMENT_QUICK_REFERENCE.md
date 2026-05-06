@@ -48,6 +48,7 @@ git push origin main
 ```bash
 ssh arthive@SERVER 'sudo systemctl status arthive-backend'
 ssh arthive@SERVER 'sudo systemctl status arthive-frontend'
+ssh arthive@SERVER 'sudo systemctl status nginx'
 ```
 
 ### View logs
@@ -57,12 +58,32 @@ ssh arthive@SERVER 'sudo journalctl -u arthive-backend -n 50'
 
 # Follow logs in real-time
 ssh arthive@SERVER 'sudo journalctl -u arthive-backend -f'
+
+# Nginx error logs
+ssh arthive@SERVER 'sudo tail -f /var/log/nginx/error.log'
+
+# Nginx access logs
+ssh arthive@SERVER 'sudo tail -f /var/log/nginx/access.log'
 ```
 
 ### Restart services
 ```bash
 ssh arthive@SERVER 'sudo systemctl restart arthive-backend'
 ssh arthive@SERVER 'sudo systemctl restart arthive-frontend'
+ssh arthive@SERVER 'sudo systemctl restart nginx'
+
+# Or restart all at once
+ssh arthive@SERVER 'sudo systemctl restart arthive-backend arthive-frontend nginx'
+```
+
+### Reload Nginx (graceful - no connection drop)
+```bash
+ssh arthive@SERVER 'sudo systemctl reload nginx'
+```
+
+### Test Nginx configuration
+```bash
+ssh arthive@SERVER 'sudo nginx -t'
 ```
 
 ### Manual deployment (without GitHub)
@@ -137,7 +158,32 @@ ssh arthive@SERVER 'free -h'  # Check memory
 
 ---
 
-## 📊 Resource Usage (Non-Docker vs Docker)
+## 🌐 Accessing Your Application
+
+### Main Access (via Nginx)
+```
+http://51.21.111.113
+```
+- Frontend automatically served at: `/`
+- API automatically routed to: `/api/`
+
+### Direct Access (if needed)
+```
+Frontend: http://51.21.111.113:3000
+Backend API: http://51.21.111.113:3001
+```
+
+### Verify Nginx is working
+```bash
+# Check Nginx status
+ssh arthive@SERVER 'sudo systemctl status nginx'
+
+# Test configuration
+ssh arthive@SERVER 'sudo nginx -t'
+
+# Check if listening on port 80
+ssh arthive@SERVER 'sudo lsof -i :80'
+```
 
 | Aspect | Non-Docker | Docker |
 |--------|-----------|--------|

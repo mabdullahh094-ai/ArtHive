@@ -5,6 +5,7 @@
 - Deploy User: `arthive`
 - PostgreSQL: ✅ Installed & configured
 - Environment Files: ✅ Created on server
+- **Nginx**: ✅ Configured (reverse proxy)
 
 ---
 
@@ -80,14 +81,18 @@ Then watch it deploy:
 
 ## After Deployment: Access Your App
 
-### Frontend
+### Primary Access (via Nginx) 🌐
 ```
-http://51.21.111.113:3000
+http://51.21.111.113
 ```
+Nginx will automatically route to:
+- `/` → Frontend (React)
+- `/api/` → Backend (API)
 
-### Backend API
+### Direct Access (if needed)
 ```
-http://51.21.111.113:3001
+Frontend: http://51.21.111.113:3000
+Backend API: http://51.21.111.113:3001
 ```
 
 ---
@@ -122,7 +127,10 @@ sudo journalctl -u arthive-backend -n 20
 7. ✅ Build frontend React app
 8. ✅ Start both services (systemd)
 9. ✅ Verify services are running
-10. ✅ Show deployment summary
+10. ✅ Check Nginx is running
+11. ✅ Test Nginx configuration
+12. ✅ Reload Nginx (graceful)
+13. ✅ Show deployment summary
 ```
 
 **Total deployment time**: ~2-3 minutes
@@ -188,11 +196,23 @@ ssh -i C:\Users\HP\.ssh\ArtHive.pem.txt arthive@51.21.111.113
 # View backend logs
 ssh ... 'sudo journalctl -u arthive-backend -f'
 
+# View frontend logs
+ssh ... 'sudo journalctl -u arthive-frontend -f'
+
+# View Nginx logs
+ssh ... 'sudo tail -f /var/log/nginx/error.log'
+
+# Check all services
+ssh ... 'sudo systemctl status arthive-backend arthive-frontend nginx'
+
 # Restart services
 ssh ... 'sudo systemctl restart arthive-backend arthive-frontend'
 
-# Check service status
-ssh ... 'sudo systemctl status arthive-backend'
+# Reload Nginx
+ssh ... 'sudo systemctl reload nginx'
+
+# Test Nginx config
+ssh ... 'sudo nginx -t'
 
 # View database
 ssh ... 'psql -h localhost -U arthive_user -d arthive_db'
@@ -207,6 +227,7 @@ ssh ... 'psql -h localhost -U arthive_user -d arthive_db'
 | Server configured | ✅ Ready |
 | PostgreSQL setup | ✅ Ready |
 | Environment files | ✅ Created |
+| Nginx setup | ✅ Configured |
 | GitHub workflow | ✅ Updated |
 | ML model | ⚠️ Verify uploaded |
 | SSH key in GitHub | ⏳ TODO |
