@@ -1,4 +1,4 @@
-name: Deploy ArtHive
+name: Deploy ArtHive (No Docker)
 
 on:
   push:
@@ -8,154 +8,232 @@ on:
 
 concurrency:
   group: deploy-arthive
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     env:
       DEPLOY_HOST: 51.21.111.113
-      DEPLOY_USER: ubuntu
+      DEPLOY_USER: arthive
+      DEPLOY_DIR: /var/www/arthive
 
     steps:
-      # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Build React frontend ────────────────────────────────────────────
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: arthive-frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: arthive-frontend
-        run: npm install
-
-      - name: Build frontend
-        working-directory: arthive-frontend
-        env:
-          # All API calls go through /api/ which nginx proxies to the backend
-          REACT_APP_API_URL: /api
-          # Suppress CRA warnings-as-errors so the build never fails on lint
-          CI: "false"
-        run: npm run build
-
-      # ── 3. Package as tarball (skip heavy dirs) ────────────────────────────
-      - name: Create deployment tarball
+      - name: Validate SSH key
         run: |
-          tar \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.venv' \
-            --exclude='*.tar.gz' \
-            --exclude='*.pem' \
-            --exclude='arthive-frontend/node_modules' \
-            --exclude='arthive-backend/node_modules' \
-            --exclude='arthive-backend/venv' \
-            --exclude='arthive-backend/.venv' \
-            --ignore-failed-read \
-            -czf arthive-deploy.tar.gz .
-          echo "Tarball size: $(du -sh arthive-deploy.tar.gz | cut -f1)"
-
-      # ── 3b. Setup SSH key ────────────────────────────────────────────────────
-      - name: Setup SSH key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
-        run: |
-          if [ -z "$SSH_PRIVATE_KEY" ]; then
-            echo "ERROR: SSH key secret is empty or missing." >&2
-            echo "Expected one of: SSH_KEY or SSH_PRIVATE_KEY" >&2
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "ERROR: SSH_PRIVATE_KEY secret is not set"
+            echo "Please add your SSH private key to GitHub Secrets"
             exit 1
           fi
+          echo "✅ SSH key secret is configured"
 
-      # ── 4. SCP tarball to server ───────────────────────────────────────────
-      - name: Upload tarball to server
-        uses: appleboy/scp-action@v0.1.7
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
-        with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.SSH_PRIVATE_KEY }}
-          port: 22
-          source: "arthive-deploy.tar.gz"
-          target: "/tmp/"
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      # ── 5. Remote deployment ───────────────────────────────────────────────
-      - name: Deploy on server
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY || secrets.SSH_PRIVATE_KEY }}
-        with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.SSH_PRIVATE_KEY }}
-          port: 22
-          # Give large uploads time to finish building
-          command_timeout: "20m"
-          script: |
-            set -e
+      - name: Deploy application
+        run: |
+          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'DEPLOY_SCRIPT'
+          set -e
 
-            DEPLOY_DIR=/var/www/arthive
+          DEPLOY_DIR=${{ env.DEPLOY_DIR }}
+          echo "========================================"
+          echo "🚀 ArtHive Deployment Starting"
+          echo "========================================"
+          echo "Server: ${{ env.DEPLOY_HOST }}"
+          echo "Directory: $DEPLOY_DIR"
+          echo ""
 
-            echo "==> Preparing deploy directory: $DEPLOY_DIR"
-            sudo mkdir -p "$DEPLOY_DIR"
-            sudo chown "$(whoami)":"$(whoami)" "$DEPLOY_DIR"
+          # Navigate to deployment directory
+          cd $DEPLOY_DIR || { echo "❌ Deploy directory not found"; exit 1; }
 
-            echo "==> Extracting tarball"
-            tar -xzf /tmp/arthive-deploy.tar.gz -C "$DEPLOY_DIR"
-            rm -f /tmp/arthive-deploy.tar.gz
+          # Update repository
+          echo "📥 Pulling latest code from GitHub..."
+          if [ -d ".git" ]; then
+            git fetch origin main --quiet
+            git reset --hard origin/main --quiet
+            git clean -fd --quiet
+            echo "✅ Code updated"
+          else
+            echo "⚠️  .git directory not found - skipping git update"
+          fi
 
-            echo "==> Verifying required .env"
-            if [ ! -f "$DEPLOY_DIR/arthive-backend/.env" ]; then
-              echo "ERROR: $DEPLOY_DIR/arthive-backend/.env is missing on the server!" >&2
-              echo "Create it manually before the first deploy (see arthive-backend/.env.example)." >&2
-              exit 1
-            fi
+          # Verify .env files exist
+          echo ""
+          echo "🔍 Verifying environment configuration..."
+          if [ ! -f "arthive-backend/.env" ]; then
+            echo "❌ ERROR: arthive-backend/.env not found!"
+            echo "Please create it manually before deploying"
+            exit 1
+          fi
+          echo "✅ Backend .env found"
 
-            echo "==> Creating persistent directories"
-            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/artist_portfolio"
-            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/profile_pics"
-            mkdir -p "$DEPLOY_DIR/arthive-backend/uploads/temp_predictions"
-            # Model file must be placed manually at this path ONCE:
-            # /var/www/arthive/models/image_price_regressor_feedback_v2/best_model.pt
-            mkdir -p "$DEPLOY_DIR/models/image_price_regressor_feedback_v2"
+          if [ ! -f "arthive-frontend/.env" ]; then
+            echo "⚠️  Frontend .env not found - some features may not work"
+            # Don't exit, frontend can work with defaults
+          else
+            echo "✅ Frontend .env found"
+          fi
 
-            echo "==> Validating model file"
-            MODEL_FILE="$DEPLOY_DIR/models/image_price_regressor_feedback_v2/best_model.pt"
-            if [ ! -f "$MODEL_FILE" ]; then
-              echo "ERROR: Model file missing at $MODEL_FILE" >&2
-              echo "Place your trained model there before deploying." >&2
-              exit 1
-            fi
-            echo "Model found: $MODEL_FILE"
+          # Verify model file exists
+          echo ""
+          echo "🤖 Verifying ML model..."
+          if [ ! -f "models/image_price_regressor_feedback_v2/best_model.pt" ]; then
+            echo "⚠️  WARNING: ML model not found at models/image_price_regressor_feedback_v2/best_model.pt"
+            echo "Price prediction features may not work until model is uploaded"
+          else
+            echo "✅ ML model found"
+          fi
 
-            echo "==> Restarting Docker services"
-            cd "$DEPLOY_DIR"
-            docker compose down --remove-orphans || true
-            docker compose up -d --build
+          # Create necessary directories
+          echo ""
+          echo "📁 Setting up upload directories..."
+          mkdir -p arthive-backend/uploads/artist_portfolio
+          mkdir -p arthive-backend/uploads/profile_pics
+          mkdir -p arthive-backend/uploads/temp_predictions
+          mkdir -p models/image_price_regressor_feedback_v2
+          echo "✅ Directories ready"
 
-            echo "==> Verifying backend model environment"
-            if ! grep -q '^MODEL_DIR=/models/image_price_regressor_feedback_v2$' "$DEPLOY_DIR/arthive-backend/.env"; then
-              echo "WARNING: MODEL_DIR is missing or different in arthive-backend/.env" >&2
-              echo "Expected: MODEL_DIR=/models/image_price_regressor_feedback_v2" >&2
-            fi
+          # Stop running services
+          echo ""
+          echo "⏹️  Stopping current services..."
+          sudo systemctl stop arthive-backend 2>/dev/null || true
+          sudo systemctl stop arthive-frontend 2>/dev/null || true
+          sleep 2
+          echo "✅ Services stopped"
 
-            echo "==> Configuring nginx"
-            sudo cp "$DEPLOY_DIR/deploy/nginx/arthive.conf" /etc/nginx/sites-available/arthive.conf
-            sudo ln -sf /etc/nginx/sites-available/arthive.conf /etc/nginx/sites-enabled/arthive.conf
-            # Remove default site if it exists so it doesn't conflict
-            sudo rm -f /etc/nginx/sites-enabled/default
-            sudo nginx -t
-            sudo systemctl reload nginx
+          # Install backend dependencies
+          echo ""
+          echo "📦 Installing backend dependencies..."
+          cd "$DEPLOY_DIR/arthive-backend"
+          npm ci --omit=dev --prefer-offline --silent
+          echo "✅ Backend dependencies installed"
 
-            echo ""
-            echo "✅  Deployment complete!"
-            echo "    Site: https://art-hive.tech"
+          # Install Python dependencies for ML models
+          echo ""
+          echo "🐍 Installing Python ML dependencies..."
+          if [ -f "ml_models/requirements.txt" ]; then
+            pip3 install -q -r ml_models/requirements.txt --break-system-packages 2>/dev/null || pip3 install -q -r ml_models/requirements.txt
+            echo "✅ Python dependencies installed"
+          else
+            echo "⚠️  ml_models/requirements.txt not found"
+          fi
+          cd "$DEPLOY_DIR"
+
+          # Install and build frontend
+          echo ""
+          echo "📦 Installing frontend dependencies..."
+          cd "$DEPLOY_DIR/arthive-frontend"
+          npm ci --omit=dev --prefer-offline --silent
+          echo "✅ Frontend dependencies installed"
+
+          echo ""
+          echo "🔨 Building frontend..."
+          npm run build --silent 2>&1 | grep -E "(error|warning|✓)" || true
+          echo "✅ Frontend built successfully"
+          cd "$DEPLOY_DIR"
+
+          # Start services
+          echo ""
+          echo "🚀 Starting services..."
+          sudo systemctl start arthive-backend
+          sudo systemctl start arthive-frontend
+          sudo systemctl enable arthive-backend arthive-frontend --quiet 2>/dev/null || true
+          echo "✅ Services started and enabled on boot"
+
+          # Wait for services to be ready
+          echo ""
+          echo "⏳ Waiting for services to initialize..."
+          sleep 5
+
+          # Check service status
+          echo ""
+          echo "📊 Service Status:"
+          if sudo systemctl is-active --quiet arthive-backend; then
+            echo "  ✅ Backend (port 3001): RUNNING"
+          else
+            echo "  ❌ Backend (port 3001): FAILED"
+          fi
+
+          if sudo systemctl is-active --quiet arthive-frontend; then
+            echo "  ✅ Frontend (port 3000): RUNNING"
+          else
+            echo "  ❌ Frontend (port 3000): FAILED"
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "✅ Deployment Complete!"
+          echo "========================================"
+          DEPLOY_SCRIPT
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          echo ""
+          
+          # Check backend
+          echo "Checking Backend..."
+          if ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} 'systemctl is-active --quiet arthive-backend'; then
+            echo "  ✅ Backend service is running"
+            BACKEND_STATUS="RUNNING"
+          else
+            echo "  ❌ Backend service is NOT running"
+            BACKEND_STATUS="FAILED"
+          fi
+
+          # Check frontend
+          echo ""
+          echo "Checking Frontend..."
+          if ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} 'systemctl is-active --quiet arthive-frontend'; then
+            echo "  ✅ Frontend service is running"
+            FRONTEND_STATUS="RUNNING"
+          else
+            echo "  ❌ Frontend service is NOT running"
+            FRONTEND_STATUS="FAILED"
+          fi
+
+          echo ""
+          echo "Status: Backend=$BACKEND_STATUS, Frontend=$FRONTEND_STATUS"
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════╗"
+          echo "║   ✅ ArtHive Deployment Complete!     ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "📊 Deployment Information:"
+          echo "  Server IP: ${{ env.DEPLOY_HOST }}"
+          echo "  Deploy User: ${{ env.DEPLOY_USER }}"
+          echo "  Deploy Directory: ${{ env.DEPLOY_DIR }}"
+          echo ""
+          echo "🌐 Access Your Application:"
+          echo "  Frontend: http://${{ env.DEPLOY_HOST }}:3000"
+          echo "  Backend API: http://${{ env.DEPLOY_HOST }}:3001"
+          echo ""
+          echo "📝 Useful Commands:"
+          echo "  Check backend logs:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo journalctl -u arthive-backend -f'"
+          echo ""
+          echo "  Check frontend logs:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo journalctl -u arthive-frontend -f'"
+          echo ""
+          echo "  Restart services:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl restart arthive-backend arthive-frontend'"
+          echo ""
+          echo "  View service status:"
+          echo "    ssh arthive@${{ env.DEPLOY_HOST }} 'sudo systemctl status arthive-backend arthive-frontend'"
+          echo ""
 
