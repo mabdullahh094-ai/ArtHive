@@ -43,7 +43,7 @@ jobs:
 
       - name: Build Frontend
         env:
-          REACT_APP_API_URL: http://${{ env.DEPLOY_HOST }}:3001/api
+          REACT_APP_API_URL: /api
         run: |
           echo "🔨 Building frontend on GitHub Actions runner..."
           cd arthive-frontend
