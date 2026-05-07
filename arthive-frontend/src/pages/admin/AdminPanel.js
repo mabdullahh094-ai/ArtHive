@@ -83,8 +83,8 @@ const AdminPanel = () => {
     },
     {
       label: 'Total Revenue',
-      value: stats?.total_revenue || 0,
-      sub: 'All-time sales',
+      value: `$${stats?.total_revenue || '0.00'}`,
+      sub: `Admin Profit (5%): $${stats?.admin_profit || '0.00'}`,
       icon: <TrendingUp />,
       color: 'warning',
     },
@@ -557,7 +557,7 @@ const AdminPanel = () => {
             ) : (
               <>
                 <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6} md>
                     <Card variant="outlined">
                       <CardContent>
                         <Typography variant="caption" color="text.secondary">Total Orders</Typography>
@@ -565,7 +565,7 @@ const AdminPanel = () => {
                       </CardContent>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6} md>
                     <Card variant="outlined">
                       <CardContent>
                         <Typography variant="caption" color="text.secondary">Completed Orders</Typography>
@@ -573,7 +573,7 @@ const AdminPanel = () => {
                       </CardContent>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6} md>
                     <Card variant="outlined">
                       <CardContent>
                         <Typography variant="caption" color="text.secondary">Gross Revenue</Typography>
@@ -581,11 +581,19 @@ const AdminPanel = () => {
                       </CardContent>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6} md>
                     <Card variant="outlined">
                       <CardContent>
                         <Typography variant="caption" color="text.secondary">Completed Revenue</Typography>
                         <Typography variant="h6" fontWeight={800}>${ordersRevenue?.completed_revenue || '0.00'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={12} md>
+                    <Card variant="outlined" sx={{ bgcolor: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.3)' }}>
+                      <CardContent>
+                        <Typography variant="caption" color="success.main" fontWeight={600}>Admin Profit (5%)</Typography>
+                        <Typography variant="h6" fontWeight={800} color="success.main">${ordersRevenue?.admin_profit || '0.00'}</Typography>
                       </CardContent>
                     </Card>
                   </Grid>

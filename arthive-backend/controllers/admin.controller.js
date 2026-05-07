@@ -359,6 +359,8 @@ const adminController = {
       );
 
       const revenue = revenueResult.rows[0] || {};
+      const completedRev = parseFloat(revenue.completed_revenue || 0);
+      const adminProfit = completedRev * 0.05;
 
       return res.json({
         success: true,
@@ -367,7 +369,8 @@ const adminController = {
           total_orders: parseInt(revenue.total_orders || 0, 10),
           completed_orders: parseInt(revenue.completed_orders || 0, 10),
           gross_revenue: parseFloat(revenue.gross_revenue || 0).toFixed(2),
-          completed_revenue: parseFloat(revenue.completed_revenue || 0).toFixed(2),
+          completed_revenue: completedRev.toFixed(2),
+          admin_profit: adminProfit.toFixed(2),
         },
         pagination: {
           page: parsedPage,
@@ -421,6 +424,9 @@ const adminController = {
          WHERE status = 'completed'`
       );
 
+      const totalRevenue = parseFloat(revenueStats.rows[0].total_revenue);
+      const adminProfit = totalRevenue * 0.05;
+
       res.json({
         success: true,
         stats: {
@@ -432,7 +438,8 @@ const adminController = {
           pending_artists: parseInt(artistStats.rows[0].pending_artists),
           verified_artists: parseInt(artistStats.rows[0].verified_artists),
           total_buyers: parseInt(buyerStats.rows[0].total_buyers),
-          total_revenue: parseFloat(revenueStats.rows[0].total_revenue).toFixed(2)
+          total_revenue: totalRevenue.toFixed(2),
+          admin_profit: adminProfit.toFixed(2)
         }
       });
     } catch (error) {
