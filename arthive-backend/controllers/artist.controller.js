@@ -740,37 +740,29 @@ const artistController = {
 
       const imageUrls = images.map((file) => `/uploads/artist_portfolio/${file.filename}`);
 
-      // Create one artwork row per uploaded image so admin and artist counts stay consistent.
-      for (let i = 0; i < imageUrls.length; i += 1) {
-        const imageUrl = imageUrls[i];
-        const resolvedTitle = imageUrls.length > 1
-          ? `${trimmedTitle} (${i + 1}/${imageUrls.length})`
-          : trimmedTitle;
-
-        const result = await db.query(
-          `INSERT INTO artworks (
-            artist_id, title, description, category_id, medium, dimensions,
-            price, image_url, image_urls, status, submission_source, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, CURRENT_TIMESTAMP)
-          RETURNING *`,
-          [
-            artistId,
-            resolvedTitle,
-            description && String(description).trim()
-              ? String(description).trim()
-              : (specialization && specialization.trim() ? specialization.trim() : null),
-            category_id ? parseInt(category_id, 10) : null,
-            medium && String(medium).trim() ? String(medium).trim() : null,
-            dimensions && String(dimensions).trim() ? String(dimensions).trim() : null,
-            parsedPrice,
-            imageUrl,
-            JSON.stringify([imageUrl]),
-            artworkStatus,
-            submissionSource,
-          ]
-        );
-        createdArtworks.push(result.rows[0]);
-      }
+      const result = await db.query(
+        `INSERT INTO artworks (
+          artist_id, title, description, category_id, medium, dimensions,
+          price, image_url, image_urls, status, submission_source, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, CURRENT_TIMESTAMP)
+        RETURNING *`,
+        [
+          artistId,
+          trimmedTitle,
+          description && String(description).trim()
+            ? String(description).trim()
+            : (specialization && specialization.trim() ? specialization.trim() : null),
+          category_id ? parseInt(category_id, 10) : null,
+          medium && String(medium).trim() ? String(medium).trim() : null,
+          dimensions && String(dimensions).trim() ? String(dimensions).trim() : null,
+          parsedPrice,
+          imageUrls[0],
+          JSON.stringify(imageUrls),
+          artworkStatus,
+          submissionSource,
+        ]
+      );
+      createdArtworks.push(result.rows[0]);
 
       // Keep denormalized count in sync with real artworks table.
       await syncArtistArtworkCount(artistId);
