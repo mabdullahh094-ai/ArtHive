@@ -307,7 +307,7 @@ const authController = {
           (hostIsLocal && lanIp ? `http://${lanIp}:3001` : null) ||
           (requestHost ? `${req.protocol}://${requestHost}` : null) ||
           configuredBackendUrl ||
-          'http://localhost:3001';
+          'https://art-hive.tech';
         const resetUrl = `${backendBaseUrl.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
 
         const emailResult = await emailService.sendPasswordResetEmail({

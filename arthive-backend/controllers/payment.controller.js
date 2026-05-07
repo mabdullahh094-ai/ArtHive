@@ -365,7 +365,7 @@ const paymentController = {
 
         await client.query('COMMIT');
 
-        const backendBaseUrl = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
+        const backendBaseUrl = (process.env.BACKEND_URL || 'https://art-hive.tech').replace(/\/$/, '');
         const trackingUrl = `${backendBaseUrl}/api/payment/track/${encodeURIComponent(trackingNumber)}`;
 
         const emailResult = await emailService.sendOrderTrackingEmail({
