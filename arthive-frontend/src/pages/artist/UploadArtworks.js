@@ -22,7 +22,7 @@ const UploadArtworks = () => {
   const [autoFilledData, setAutoFilledData] = useState(null);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const MAX_IMAGES = 20;
-  const MIN_RECOMMENDED_IMAGES = 4;
+  const MIN_RECOMMENDED_IMAGES = 1;
 
   const extractImageMetrics = (img) => {
     const canvas = document.createElement('canvas');
@@ -381,7 +381,7 @@ const UploadArtworks = () => {
           Add artwork details and upload one or more images. All images will appear in the artwork detail gallery.
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          You can upload 4, 5, or more images for one artwork (max {MAX_IMAGES}).
+          You can upload 1, 2, or more images for one artwork (max {MAX_IMAGES}).
         </Typography>
 
         {checkingStatus ? (
