@@ -84,7 +84,7 @@ const analyzeImage = async (req, res) => {
 function callPythonImageAnalyzer(imagePath) {
   return new Promise((resolve, reject) => {
     try {
-      const pythonProcess = spawn('python3', [ANALYZE_IMAGE_SCRIPT, imagePath]);
+      const pythonProcess = spawn('python', [ANALYZE_IMAGE_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
@@ -151,67 +151,155 @@ function callPythonImageAnalyzer(imagePath) {
 /**
  * Predict artwork price using ML model
  * POST /api/artist/predict-price
- * Uses image-based PyTorch model for prediction
- * Expects: multipart/form-data with 'image' file
+ * Supports both image-based prediction (new) and feature-based prediction (legacy)
  */
 const predictPrice = async (req, res) => {
   try {
-    // Check if image file was uploaded
-    if (!req.file) {
+    const { artworkData, imagePath } = req.body;
+
+    // Validate input
+    if (!artworkData && !imagePath) {
       return res.status(400).json({
         success: false,
-        error: 'Image file is required for price prediction'
+        error: 'Either artworkData or imagePath is required'
       });
     }
 
-    const imagePath = req.file.path;
-    console.log(`[Price Prediction] Processing image: ${imagePath}`);
-
-    // Use PyTorch image-based prediction
-    try {
-      const prediction = await callPythonPredictorImage(imagePath);
+    // NEW: Image-based prediction using PyTorch model
+    if (imagePath || artworkData?.imagePath) {
+      const imagePathToUse = imagePath || artworkData.imagePath;
       
-      if (!prediction.success) {
-        // Clean up temp file
-        fs.unlink(imagePath, (err) => {
-          if (err) console.warn('Failed to delete temp image:', err);
-        });
-        
+      if (!fs.existsSync(imagePathToUse)) {
         return res.status(400).json({
           success: false,
-          error: prediction.error || 'Image-based prediction failed'
+          error: 'Image file not found at: ' + imagePathToUse
         });
       }
 
-      // Clean up temp file after successful prediction
-      fs.unlink(imagePath, (err) => {
-        if (err) console.warn('Failed to delete temp image:', err);
-      });
-
-      return res.json({
-        success: true,
-        prediction: {
-          predicted_price_pkr: prediction.predicted_price_pkr,
-          price_range: prediction.price_range,
-          confidence: prediction.confidence,
-          currency: prediction.currency,
-          model_type: 'image_based_pytorch',
-          model_location: process.env.MODEL_PATH || process.env.MODEL_DIR || '/models/image_price_regressor_feedback_v2'
+      try {
+        const prediction = await callPythonPredictorImage(imagePathToUse);
+        
+        if (!prediction.success) {
+          return res.status(400).json({
+            success: false,
+            error: prediction.error || 'Image-based prediction failed'
+          });
         }
-      });
-    } catch (error) {
-      // Clean up temp file on error
-      fs.unlink(imagePath, (err) => {
-        if (err) console.warn('Failed to delete temp image:', err);
-      });
-      
-      console.error('Image-based prediction error:', error);
-      return res.status(500).json({
+
+        return res.json({
+          success: true,
+          prediction: {
+            predicted_price_pkr: prediction.predicted_price_pkr,
+            price_range: prediction.price_range,
+            confidence: prediction.confidence,
+            currency: prediction.currency,
+            model_type: 'image_based_pytorch',
+            model_location: 'C:\\Users\\11 TRDs\\Desktop\\Abdullah\\Scrapping\\models\\image_price_regressor_feedback_v2',
+            image_path: imagePathToUse
+          }
+        });
+      } catch (error) {
+        console.error('Image-based prediction error:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Image-based prediction failed: ' + error.message
+        });
+      }
+    }
+
+    // LEGACY: Feature-based prediction
+    // Validate input
+    const toValidCategory = (value, allowed, fallback) => {
+      const normalized = String(value ?? '').trim().toLowerCase();
+      return allowed.includes(normalized) ? normalized : fallback;
+    };
+
+    const validMediums = ['acrylic', 'charcoal', 'digital', 'gouache', 'ink', 'mixed_media', 'oil', 'pastel', 'watercolor'];
+    const validStyles = ['abstract', 'conceptual', 'expressionism', 'impressionism', 'landscape', 'minimalism', 'pop_art', 'portrait', 'realism', 'surrealism'];
+    const validConditions = ['excellent', 'fair', 'good', 'new'];
+    const validCountries = ['bangladesh', 'canada', 'france', 'germany', 'india', 'italy', 'japan', 'pakistan', 'turkey', 'uae', 'uk', 'usa'];
+    const countryCaseMap = {
+      bangladesh: 'Bangladesh',
+      canada: 'Canada',
+      france: 'France',
+      germany: 'Germany',
+      india: 'India',
+      italy: 'Italy',
+      japan: 'Japan',
+      pakistan: 'Pakistan',
+      turkey: 'Turkey',
+      uae: 'UAE',
+      uk: 'UK',
+      usa: 'USA'
+    };
+
+    let normalizedCondition = String(artworkData.condition ?? '').trim().toLowerCase();
+    if (normalizedCondition === 'poor') {
+      normalizedCondition = 'fair';
+    }
+
+    // Prepare features for Python model
+    const features = {
+      width_cm: parseFloat(artworkData.width_cm) || 50,
+      height_cm: parseFloat(artworkData.height_cm) || 60,
+      size_cm2: parseFloat(artworkData.size_cm2) || 3000,
+      aspect_ratio: parseFloat(artworkData.aspect_ratio) || 0.83,
+      medium: toValidCategory(artworkData.medium, validMediums, 'oil'),
+      style: toValidCategory(artworkData.style, validStyles, 'impressionism'),
+      artist_experience_years: parseInt(artworkData.artist_experience_years) || 5,
+      artist_previous_sales: parseInt(artworkData.artist_previous_sales) || 0,
+      artist_reputation_score: parseFloat(artworkData.artist_reputation_score) || 3.0,
+      country: countryCaseMap[toValidCategory(artworkData.country, validCountries, 'pakistan')],
+      is_original: parseInt(artworkData.is_original) || 1,
+      edition_size: parseInt(artworkData.edition_size) || 1,
+      condition: toValidCategory(normalizedCondition, validConditions, 'good'),
+      year_created: parseInt(artworkData.year_created) || new Date().getFullYear(),
+      time_taken_hours: parseFloat(artworkData.time_taken_hours) || 10,
+      ai_quality_score: parseFloat(artworkData.ai_quality_score) || 0.75,
+      ai_authenticity_score: parseFloat(artworkData.ai_authenticity_score) || 0.80,
+      image_brightness_score: parseFloat(artworkData.image_brightness_score) || 0.70,
+      image_contrast_score: parseFloat(artworkData.image_contrast_score) || 0.75,
+      composition_score: parseFloat(artworkData.composition_score) || 0.80,
+      color_harmony_score: parseFloat(artworkData.color_harmony_score) || 0.80,
+      subject_complexity_score: parseFloat(artworkData.subject_complexity_score) || 0.75,
+      market_demand_index: parseFloat(artworkData.market_demand_index) || 0.50
+    };
+
+    // Call Python prediction script
+    const prediction = await callPythonPredictor(features);
+
+    if (!prediction.success) {
+      return res.status(400).json({
         success: false,
-        error: 'Image-based prediction failed: ' + error.message,
-        details: error.toString()
+        error: prediction.error || 'Prediction failed'
       });
     }
+
+    // Return prediction with additional metadata
+    return res.json({
+      success: true,
+      prediction: {
+        predicted_price: prediction.predicted_price,
+        price_range: prediction.price_range,
+        confidence: prediction.confidence,
+        currency: 'USD',
+        model_info: {
+          accuracy: 'R² = 0.7746 (77.46%)',
+          training_samples: 4000,
+          test_rmse: '$714.08'
+        }
+      },
+      artworkSummary: {
+        medium: features.medium,
+        style: features.style,
+        size_cm2: features.size_cm2,
+        condition: features.condition,
+        is_original: features.is_original === 1 ? 'Original' : 'Copy',
+        artist_experience: `${features.artist_experience_years} years`,
+        artist_sales: features.artist_previous_sales
+      }
+    });
+
   } catch (error) {
     console.error('Price prediction error:', error);
     res.status(500).json({
@@ -230,7 +318,7 @@ function callPythonPredictorImage(imagePath) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process with image path as argument
-      const pythonProcess = spawn('python3', [PREDICT_SCRIPT, imagePath]);
+      const pythonProcess = spawn('python', [PREDICT_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
@@ -306,7 +394,7 @@ function callPythonPredictor(features) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process
-      const pythonProcess = spawn('python3', [PREDICT_SCRIPT]);
+      const pythonProcess = spawn('python', [PREDICT_SCRIPT]);
 
       let outputData = '';
       let errorData = '';
@@ -389,7 +477,7 @@ with contextlib.redirect_stdout(io.StringIO()):
 print(json.dumps(result))
 `;
 
-  const pythonProcess = spawn('python3', ['-c', pythonCode, JSON.stringify(features)]);
+  const pythonProcess = spawn('python', ['-c', pythonCode, JSON.stringify(features)]);
     let outputData = '';
 
     pythonProcess.stdout.on('data', (data) => {

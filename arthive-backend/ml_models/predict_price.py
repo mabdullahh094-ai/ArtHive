@@ -16,21 +16,8 @@ from torchvision import models, transforms
 
 # Ensure we're in the correct directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-def resolve_model_path():
-    env_model_path = os.getenv('MODEL_PATH')
-    if env_model_path:
-        return env_model_path
-
-    env_model_dir = os.getenv('MODEL_DIR')
-    if env_model_dir:
-        return os.path.join(env_model_dir, 'best_model.pt')
-
-    # Fallback to repository-level Scrapping/models directory.
-    repo_root = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
-    return os.path.join(repo_root, 'Scrapping', 'models', 'image_price_regressor_feedback_v2', 'best_model.pt')
-
-MODEL_PATH = resolve_model_path()
+# Updated to use new model location
+MODEL_PATH = r'C:\Users\11 TRDs\Desktop\Abdullah\Scrapping\models\image_price_regressor_feedback_v2\best_model.pt'
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
 FEATURES_INFO_PATH = os.path.join(SCRIPT_DIR, 'features_info.json')
 
@@ -67,10 +54,10 @@ class PricePredictor:
             
             self.model = model
             self.is_loaded = True
-            print(f"[OK] Model loaded successfully. Using device: {self.device}", file=sys.stderr)
+            print(f"[✓] Model loaded successfully! Using device: {self.device}")
             
         except Exception as e:
-            print(f"[ERROR] Error loading model: {e}", file=sys.stderr)
+            print(f"[✗] Error loading model: {e}")
             self.is_loaded = False
     
     def preprocess_image(self, image_path: str) -> torch.Tensor:
@@ -194,7 +181,7 @@ def test_prediction():
     print(f"  - Image path: {test_image_path}")
     
     if not os.path.exists(test_image_path):
-        print(f"\n[ERROR] Test image not found: {test_image_path}")
+        print(f"\n✗ Test image not found: {test_image_path}")
         print("  Please provide a valid test image in ml_models/test_images/ directory")
         return
     
@@ -203,12 +190,12 @@ def test_prediction():
     result = predictor.predict(test_image_path)
     
     if result['success']:
-        print(f"\n[OK] PREDICTION SUCCESSFUL!")
+        print(f"\n✓ PREDICTION SUCCESSFUL!")
         print(f"  - Predicted Price (PKR): {result['predicted_price_pkr']:,.2f}")
         print(f"  - Price Range: PKR {result['price_range']['min']:,.2f} - PKR {result['price_range']['max']:,.2f}")
         print(f"  - Confidence: {result['confidence']*100:.2f}%")
     else:
-        print(f"\n[ERROR] PREDICTION FAILED: {result['error']}")
+        print(f"\n✗ PREDICTION FAILED: {result['error']}")
     
     print("\n" + "=" * 60)
 
@@ -220,3 +207,8 @@ if __name__ == "__main__":
         print(json.dumps(result))
     else:
         test_prediction()
+    
+    print("\n" + "=" * 60)
+
+if __name__ == "__main__":
+    test_prediction()
