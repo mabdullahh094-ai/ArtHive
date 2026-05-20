@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from "@mui/material";
+import { Container, Paper, TextField, Button, Typography, Box, Alert, InputAdornment, IconButton, useTheme, useMediaQuery } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 
 const Login = () => {
@@ -11,6 +12,10 @@ const Login = () => {
     email: "",
     password: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [message, setMessage] = useState({ text: "", type: "" });
   const [loading, setLoading] = useState(false);
@@ -80,7 +85,8 @@ const Login = () => {
             inputProps={{ autoComplete: 'new-email' }}
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
           />
 
@@ -88,14 +94,35 @@ const Login = () => {
             fullWidth
             label="Password"
             name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             inputProps={{ autoComplete: 'new-password' }}
             value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
-            margin="normal"
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
             required
           />
 
@@ -104,7 +131,8 @@ const Login = () => {
             fullWidth
             variant="contained"
             disabled={loading}
-            sx={{ mt: 2.5 }}
+            size={isMobile ? 'small' : 'medium'}
+            sx={{ mt: isMobile ? 1.5 : 2.5 }}
           >
             {loading ? "Signing In..." : "Sign In"}
           </Button>

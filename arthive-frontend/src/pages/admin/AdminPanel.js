@@ -82,6 +82,20 @@ const AdminPanel = () => {
       color: 'info',
     },
     {
+      label: "Today's Revenue",
+      value: `$${stats?.daily_revenue || '0.00'}`,
+      sub: `Admin Profit (5%): $${((parseFloat(stats?.daily_revenue) || 0) * 0.05).toFixed(2)}`,
+      icon: <TrendingUp />,
+      color: 'warning',
+    },
+    {
+      label: 'This Month',
+      value: `$${stats?.monthly_revenue || '0.00'}`,
+      sub: `Admin Profit (5%): $${((parseFloat(stats?.monthly_revenue) || 0) * 0.05).toFixed(2)}`,
+      icon: <TrendingUp />,
+      color: 'warning',
+    },
+    {
       label: 'Total Revenue',
       value: `$${stats?.total_revenue || '0.00'}`,
       sub: `Admin Profit (5%): $${stats?.admin_profit || '0.00'}`,
@@ -300,13 +314,35 @@ const AdminPanel = () => {
       return stringValue;
     };
 
-    // Add headers
-    csvRows.push(headers.map(escapeCSV).join(','));
+    if (tab === 2) {
+      // For orders/revenue export, include a summary block first
+      csvRows.push(['Metric', 'Value'].map(escapeCSV).join(','));
+      csvRows.push(['Total Orders', ordersRevenue?.total_orders || 0].map(escapeCSV).join(','));
+      csvRows.push(['Completed Orders', ordersRevenue?.completed_orders || 0].map(escapeCSV).join(','));
+      csvRows.push(['Gross Revenue', `$${ordersRevenue?.gross_revenue || '0.00'}`].map(escapeCSV).join(','));
+      csvRows.push(['Completed Revenue', `$${ordersRevenue?.completed_revenue || '0.00'}`].map(escapeCSV).join(','));
+      csvRows.push(['Admin Profit (5%)', `$${ordersRevenue?.admin_profit || '0.00'}`].map(escapeCSV).join(','));
+      // Include dashboard stats if available
+      if (stats) {
+        csvRows.push(['Today Revenue', `$${stats.daily_revenue || '0.00'}`].map(escapeCSV).join(','));
+        csvRows.push(['This Month Revenue', `$${stats.monthly_revenue || '0.00'}`].map(escapeCSV).join(','));
+      }
 
-    // Add data rows
-    data.forEach(row => {
-      csvRows.push(row.map(escapeCSV).join(','));
-    });
+      // Blank line then orders table
+      csvRows.push('');
+      csvRows.push(headers.map(escapeCSV).join(','));
+      data.forEach(row => {
+        csvRows.push(row.map(escapeCSV).join(','));
+      });
+    } else {
+      // Add headers
+      csvRows.push(headers.map(escapeCSV).join(','));
+
+      // Add data rows
+      data.forEach(row => {
+        csvRows.push(row.map(escapeCSV).join(','));
+      });
+    }
 
     // Add UTF-8 BOM for Excel compatibility
     const csvContent = '\uFEFF' + csvRows.join('\r\n');
@@ -316,7 +352,7 @@ const AdminPanel = () => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
-    const tabName = tab === 0 ? 'Artists' : 'Buyers';
+    const tabName = tab === 0 ? 'Artists' : tab === 1 ? 'Buyers' : 'Revenue';
     const fileName = `${tabName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`;
     
     link.setAttribute('href', url);
@@ -371,7 +407,7 @@ const AdminPanel = () => {
         {/* Statistics Cards */}
         <Grid container spacing={2} sx={{ my: 3 }}>
           {statCards.map((card) => (
-            <Grid item xs={6} sm={6} md={3} key={card.label}>
+            <Grid item xs={12} sm={6} md={3} key={card.label}>
               <Card
                 sx={{
                   minHeight: { xs: 120, sm: 140 },

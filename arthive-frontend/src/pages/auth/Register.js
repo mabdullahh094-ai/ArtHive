@@ -3,8 +3,9 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   Container, Paper, TextField, Button, Typography, Box, Alert,
-  MenuItem, Select, FormControl, InputLabel 
+  MenuItem, Select, FormControl, InputLabel, InputAdornment, IconButton, useTheme, useMediaQuery 
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import { normalizeEmailInput, toTitleCaseInput } from "../../utils/formatters";
 
@@ -25,6 +26,10 @@ const Register = () => {
   const [message, setMessage] = useState({ text: "", type: "" });
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     const handleScroll = () => {
@@ -170,7 +175,8 @@ const Register = () => {
             name="first_name"
             value={formData.first_name}
             onChange={handleChange}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
             disabled={loading}
           />
@@ -182,7 +188,8 @@ const Register = () => {
             name="last_name"
             value={formData.last_name}
             onChange={handleChange}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
             disabled={loading}
           />
@@ -195,7 +202,8 @@ const Register = () => {
             type="email"
             value={formData.email}
             onChange={handleChange}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
             disabled={loading}
             error={!!emailError}
@@ -207,13 +215,36 @@ const Register = () => {
             fullWidth
             label="Password"
             name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={formData.password}
             onChange={handleChange}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
             disabled={loading}
             helperText="8-15 chars, 1 uppercase, 1 lowercase, 1 special character"
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
           {/* Confirm Password */}
@@ -221,12 +252,35 @@ const Register = () => {
             fullWidth
             label="Confirm Password"
             name="confirmPassword"
-            type="password"
+            type={showConfirmPassword ? "text" : "password"}
             value={formData.confirmPassword}
             onChange={handleChange}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
             required
             disabled={loading}
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           
           {/* User Type */}
@@ -266,9 +320,9 @@ const Register = () => {
             type="submit"
             fullWidth
             variant="contained"
-            size="large"
+            size={isMobile ? 'small' : 'large'}
             disabled={loading}
-            sx={{ mt: 2.5, mb: 1.5 }}
+            sx={{ mt: isMobile ? 1.5 : 2.5, mb: 1.5 }}
           >
             {loading ? "Creating Account..." : "Sign Up"}
           </Button>

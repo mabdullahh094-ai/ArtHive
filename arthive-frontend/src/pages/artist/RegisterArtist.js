@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Paper, TextField, Button, Typography, Box, Alert } from '@mui/material';
+import { Container, Paper, TextField, Button, Typography, Box, Alert, InputAdornment, IconButton, useTheme, useMediaQuery } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { authAPI } from '../../services/api';
 import { normalizeEmailInput, toTitleCaseInput } from '../../utils/formatters';
 
@@ -10,6 +11,10 @@ const RegisterArtist = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [emailError, setEmailError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const validatePassword = (pwd) => {
     if (!pwd) return { ok: false, msg: 'Password is required' };
@@ -84,12 +89,107 @@ const RegisterArtist = () => {
         <Typography variant="h4" align="center" gutterBottom>Artist Sign Up</Typography>
         {message.text && <Alert severity={message.type} sx={{ mb: 2 }}>{message.text}</Alert>}
         <Box component="form" onSubmit={handleSubmit}>
-          <TextField fullWidth label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} margin="normal" required />
-          <TextField fullWidth label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} margin="normal" required />
-          <TextField fullWidth label="Email" name="email" type="email" value={formData.email} onChange={handleChange} margin="normal" error={!!emailError} helperText={emailError || ''} required />
-          <TextField fullWidth label="Password" name="password" type="password" value={formData.password} onChange={handleChange} margin="normal" helperText="8-15 chars, 1 uppercase, 1 lowercase, 1 special" required />
-          <TextField fullWidth label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} margin="normal" required />
-          <Button type="submit" fullWidth variant="contained" sx={{ mt: 3 }}>{loading ? 'Creating...' : 'Create Artist Account'}</Button>
+          <TextField
+            fullWidth
+            label="First Name"
+            name="first_name"
+            value={formData.first_name}
+            onChange={handleChange}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            required
+          />
+          <TextField
+            fullWidth
+            label="Last Name"
+            name="last_name"
+            value={formData.last_name}
+            onChange={handleChange}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            required
+          />
+          <TextField
+            fullWidth
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            error={!!emailError}
+            helperText={emailError || ''}
+            required
+          />
+          <TextField
+            fullWidth
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={handleChange}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            helperText="8-15 chars, 1 uppercase, 1 lowercase, 1 special"
+            required
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            fullWidth
+            label="Confirm Password"
+            name="confirmPassword"
+            type={showConfirmPassword ? 'text' : 'password'}
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            required
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button type="submit" fullWidth variant="contained" size={isMobile ? 'small' : 'medium'} sx={{ mt: isMobile ? 1.5 : 3 }}>{loading ? 'Creating...' : 'Create Artist Account'}</Button>
         </Box>
       </Paper>
     </Container>

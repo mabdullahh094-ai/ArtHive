@@ -124,16 +124,6 @@ const ArtistDashboard = () => {
     return date.toISOString().slice(0, 10);
   };
 
-  const formatSoldDate = (value) => {
-    if (!value) return 'Date N/A';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Date N/A';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
 
   const getDateKey = (value) => {
     if (!value) return 'unknown';
@@ -343,62 +333,7 @@ const ArtistDashboard = () => {
             </Grid>
           )}
 
-          {/* Recently Sold Paintings */}
-          {stats && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 700 }}>
-                Recently Sold Paintings
-              </Typography>
-
-              {Array.isArray(stats.recent_sold_artworks) && stats.recent_sold_artworks.length > 0 ? (
-                <Grid container spacing={{ xs: 1, sm: 1.25 }}>
-                  {stats.recent_sold_artworks.map((soldItem) => (
-                    <Grid item xs={12} sm={6} md={4} key={`${soldItem.order_id}-${soldItem.id}`}>
-                      <Card sx={{ borderRadius: 2, border: '1px solid rgba(15,23,42,0.08)' }}>
-                        {soldItem.image_url && (
-                          <CardMedia
-                            component="img"
-                            image={soldItem.image_url}
-                            alt={soldItem.title}
-                            sx={{ height: { xs: 135, sm: 145 }, objectFit: 'cover', backgroundColor: '#f5f5f5' }}
-                          />
-                        )}
-                        <CardContent sx={{ p: 1.2, '&:last-child': { pb: 1.2 } }}>
-                          <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.78rem', sm: '0.86rem' } }} noWrap>
-                            {soldItem.title || 'Untitled Artwork'}
-                          </Typography>
-
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.45, fontSize: { xs: '0.66rem', sm: '0.72rem' } }}>
-                            Order #{soldItem.order_number || soldItem.order_id}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.66rem', sm: '0.72rem' } }}>
-                            Sold on {formatSoldDate(soldItem.order_date)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.66rem', sm: '0.72rem' } }}>
-                            Buyer: {`${soldItem.buyer_first_name || ''} ${soldItem.buyer_last_name || ''}`.trim() || 'N/A'}
-                          </Typography>
-
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.8 }}>
-                            <Chip
-                              size="small"
-                              label={`Qty: ${soldItem.quantity || 0}`}
-                              color="success"
-                              sx={{ height: 21, '& .MuiChip-label': { px: 0.8, fontSize: '0.62rem' } }}
-                            />
-                            <Typography sx={{ fontWeight: 800, color: 'success.dark', fontSize: { xs: '0.74rem', sm: '0.82rem' } }}>
-                              {formatCurrency(soldItem.line_revenue)}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Alert severity="info">No sold paintings yet.</Alert>
-              )}
-            </Box>
-          )}
+          {/* Recently sold paintings moved to separate view; removed here. */}
 
           {/* Artworks Section */}
           <Box>

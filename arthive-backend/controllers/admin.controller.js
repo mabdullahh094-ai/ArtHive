@@ -424,8 +424,23 @@ const adminController = {
          WHERE status = 'completed'`
       );
 
+      // Also compute daily and monthly revenue
+      const dailyRevenueRes = await db.query(
+        `SELECT COALESCE(SUM(total_amount), 0) as daily_revenue
+         FROM orders
+         WHERE status = 'completed' AND created_at::date = CURRENT_DATE`
+      );
+
+      const monthlyRevenueRes = await db.query(
+        `SELECT COALESCE(SUM(total_amount), 0) as monthly_revenue
+         FROM orders
+         WHERE status = 'completed' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`
+      );
+
       const totalRevenue = parseFloat(revenueStats.rows[0].total_revenue);
       const adminProfit = totalRevenue * 0.05;
+      const dailyRevenue = parseFloat(dailyRevenueRes.rows[0].daily_revenue || 0);
+      const monthlyRevenue = parseFloat(monthlyRevenueRes.rows[0].monthly_revenue || 0);
 
       res.json({
         success: true,
@@ -439,7 +454,9 @@ const adminController = {
           verified_artists: parseInt(artistStats.rows[0].verified_artists),
           total_buyers: parseInt(buyerStats.rows[0].total_buyers),
           total_revenue: totalRevenue.toFixed(2),
-          admin_profit: adminProfit.toFixed(2)
+          admin_profit: adminProfit.toFixed(2),
+          daily_revenue: dailyRevenue.toFixed(2),
+          monthly_revenue: monthlyRevenue.toFixed(2),
         }
       });
     } catch (error) {

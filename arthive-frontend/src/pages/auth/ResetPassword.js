@@ -5,10 +5,15 @@ import {
   Box,
   Button,
   Container,
+  IconButton,
+  InputAdornment,
   Paper,
   TextField,
   Typography,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { authAPI } from "../../services/api";
 
 const ResetPassword = () => {
@@ -29,6 +34,10 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -95,21 +104,67 @@ const ResetPassword = () => {
           <TextField
             fullWidth
             required
-            type="password"
+            type={showPassword ? "text" : "password"}
             label="New Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
           <TextField
             fullWidth
             required
-            type="password"
+            type={showConfirmPassword ? "text" : "password"}
             label="Confirm Password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            margin="normal"
+            margin={isMobile ? 'dense' : 'normal'}
+            size={isMobile ? 'small' : 'medium'}
+            sx={{
+              '& input::-ms-reveal, & input::-ms-clear': {
+                display: 'none',
+              },
+              '& input::-webkit-credentials-auto-fill-button': {
+                display: 'none',
+              },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    edge="end"
+                    size={isMobile ? 'small' : 'medium'}
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
           <Button
@@ -117,7 +172,8 @@ const ResetPassword = () => {
             fullWidth
             variant="contained"
             disabled={loading}
-            sx={{ mt: 2 }}
+            size={isMobile ? 'small' : 'medium'}
+            sx={{ mt: isMobile ? 1.5 : 2 }}
           >
             {loading ? "Updating..." : "Update Password"}
           </Button>
