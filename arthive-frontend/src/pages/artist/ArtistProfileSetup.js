@@ -156,14 +156,14 @@ const ArtistProfileSetup = () => {
       }
 
       const totalPortfolioAfterUpload = existingPortfolioCount + portfolioImages.length;
-      if (totalPortfolioAfterUpload < 4) {
-        setMessage({ text: 'Please ensure at least 4 portfolio artworks are submitted for admin review.', type: 'error' });
+      if (totalPortfolioAfterUpload < 1) {
+        setMessage({ text: 'Please ensure at least 1 portfolio artwork is submitted for admin review.', type: 'error' });
         setLoading(false);
         return;
       }
 
-      if (existingPortfolioCount < 4 && portfolioImages.length > 0 && portfolioImages.length < 4) {
-        setMessage({ text: 'Please upload at least 4 artwork images in one submission.', type: 'error' });
+      if (existingPortfolioCount < 1 && portfolioImages.length > 0 && portfolioImages.length < 1) {
+        setMessage({ text: 'Please upload at least 1 artwork image in one submission.', type: 'error' });
         setLoading(false);
         return;
       }
@@ -223,7 +223,7 @@ const ArtistProfileSetup = () => {
           Complete Your Artist Profile
         </Typography>
         <Typography variant="body1" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
-          Fill out your profile details and submit at least 4 portfolio artworks. Admin will review your profile and artworks, then approve or reject.
+          Fill out your profile details and submit at least 1 portfolio artwork. Admin will review your profile and artworks, then approve or reject.
         </Typography>
 
         {/* Verification Status Messages */}
@@ -388,7 +388,7 @@ const ArtistProfileSetup = () => {
 
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Typography variant="subtitle2">Portfolio Artworks (Minimum 4 total)</Typography>
+                <Typography variant="subtitle2">Portfolio Artworks (Minimum 1 total)</Typography>
                 <Typography variant="caption" color="text.secondary">
                   Already submitted: {existingPortfolioCount} | Selected now: {portfolioImages.length}
                 </Typography>

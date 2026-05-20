@@ -95,7 +95,7 @@ const ensureOrdersSchema = async () => {
 
   await db.query(`
     UPDATE orders
-    SET order_number = COALESCE(order_number, CONCAT('ORD-', TO_CHAR(created_at, 'YYYYMMDD'), '-', id::text))
+    SET order_number = COALESCE(order_number, CONCAT('ORD-', TO_CHAR(order_date, 'YYYYMMDD'), '-', id::text))
     WHERE order_number IS NULL
   `);
 
@@ -160,7 +160,7 @@ const ensureOrdersSchema = async () => {
 
   await db.query(`
     UPDATE orders
-    SET tracking_number = COALESCE(tracking_number, CONCAT('TRK-', TO_CHAR(created_at, 'YYYYMMDD'), '-', id::text))
+    SET tracking_number = COALESCE(tracking_number, CONCAT('TRK-', TO_CHAR(order_date, 'YYYYMMDD'), '-', id::text))
     WHERE tracking_number IS NULL
   `);
 
@@ -170,7 +170,7 @@ const ensureOrdersSchema = async () => {
 
   await db.query(`
     ALTER TABLE orders
-    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ADD COLUMN IF NOT EXISTS order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   `);
 
   await db.query(`
@@ -328,7 +328,7 @@ const paymentController = {
              estimated_delivery
            )
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-           RETURNING id, created_at`,
+           RETURNING id, order_date`,
           [
             generateOrderNumber(),
             buyerId,
@@ -346,7 +346,7 @@ const paymentController = {
         );
 
         orderId = orderResult.rows[0].id;
-        orderDate = orderResult.rows[0].created_at;
+        orderDate = orderResult.rows[0].order_date;
 
         // Create order items
         for (const item of itemDetails) {
@@ -365,7 +365,7 @@ const paymentController = {
 
         await client.query('COMMIT');
 
-        const backendBaseUrl = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
+        const backendBaseUrl = (process.env.BACKEND_URL || 'https://art-hive.tech').replace(/\/$/, '');
         const trackingUrl = `${backendBaseUrl}/api/payment/track/${encodeURIComponent(trackingNumber)}`;
 
         const emailResult = await emailService.sendOrderTrackingEmail({
@@ -471,10 +471,10 @@ const paymentController = {
       const { limit = 10, offset = 0 } = req.query;
 
       const ordersResult = await db.query(
-        `SELECT id, total_amount, status, created_at, payment_intent_id, tracking_number, tracking_status, shipping_carrier, estimated_delivery
+        `SELECT id, total_amount, status, order_date as created_at, payment_intent_id, tracking_number, tracking_status, shipping_carrier, estimated_delivery
          FROM orders
          WHERE buyer_id = $1
-         ORDER BY created_at DESC
+         ORDER BY order_date DESC
          LIMIT $2 OFFSET $3`,
         [buyerId, limit, offset]
       );
@@ -511,7 +511,7 @@ const paymentController = {
       }
 
       const trackingResult = await db.query(
-        `SELECT o.id, o.order_number, o.status, o.tracking_number, o.tracking_status, o.shipping_carrier, o.estimated_delivery, o.created_at,
+        `SELECT o.id, o.order_number, o.status, o.tracking_number, o.tracking_status, o.shipping_carrier, o.estimated_delivery, o.order_date as created_at,
                 u.first_name, u.last_name
          FROM orders o
          JOIN users u ON o.buyer_id = u.id

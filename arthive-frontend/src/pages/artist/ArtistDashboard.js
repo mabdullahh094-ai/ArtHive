@@ -13,7 +13,15 @@ import {
   Chip,
   CircularProgress,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Tooltip,
+  InputAdornment
 } from '@mui/material';
+import { Edit, Delete } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { authAPI, artistAPI } from '../../services/api';
 
@@ -24,6 +32,65 @@ const ArtistDashboard = () => {
   const [artworks, setArtworks] = useState([]);
   const [dateSearch, setDateSearch] = useState('');
   const [stats, setStats] = useState(null);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedArtwork, setSelectedArtwork] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    price: '',
+    status: ''
+  });
+
+  const handleEditClick = (artwork) => {
+    setSelectedArtwork(artwork);
+    setEditForm({
+      title: artwork.title || '',
+      description: artwork.description || '',
+      price: artwork.price || '',
+      status: artwork.status || 'pending'
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (artwork) => {
+    setSelectedArtwork(artwork);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      setActionLoading(true);
+      const res = await artistAPI.updateArtwork(selectedArtwork.id, editForm);
+      if (res.data.success) {
+        setArtworks(artworks.map(a => a.id === selectedArtwork.id ? { ...a, ...res.data.artwork } : a));
+        setEditDialogOpen(false);
+      }
+    } catch (err) {
+      console.error('Update failed', err);
+      alert('Failed to update artwork');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setActionLoading(true);
+      const res = await artistAPI.deleteArtwork(selectedArtwork.id);
+      if (res.data.success) {
+        setArtworks(artworks.filter(a => a.id !== selectedArtwork.id));
+        setDeleteDialogOpen(false);
+      }
+    } catch (err) {
+      console.error('Delete failed', err);
+      alert('Failed to delete artwork');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const formatCurrency = (value) => {
     const amount = Number(value || 0);
@@ -365,7 +432,19 @@ const ArtistDashboard = () => {
                   <Grid container spacing={{ xs: 1, sm: 1.25 }}>
                     {group.items.map((artwork) => (
                       <Grid item xs={6} sm={4} md={3} lg={2} key={artwork.id}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: { xs: 1.5, sm: 2 } }}>
+                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: { xs: 1.5, sm: 2 }, position: 'relative' }}>
+                          <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.5, zIndex: 2 }}>
+                            <Tooltip title="Edit">
+                              <IconButton size="small" onClick={() => handleEditClick(artwork)} sx={{ bgcolor: 'rgba(255,255,255,0.8)', '&:hover': { bgcolor: 'white' } }}>
+                                <Edit fontSize="small" color="primary" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton size="small" onClick={() => handleDeleteClick(artwork)} sx={{ bgcolor: 'rgba(255,255,255,0.8)', '&:hover': { bgcolor: 'white' } }}>
+                                <Delete fontSize="small" color="error" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                           {artwork.image_url && (
                             <CardMedia
                               component="img"
@@ -415,6 +494,60 @@ const ArtistDashboard = () => {
           </Box>
         </Paper>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Artwork</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            fullWidth
+            label="Title"
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+            sx={{ mb: 2, mt: 1 }}
+          />
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Description"
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Price"
+            type="number"
+            InputProps={{
+              startAdornment: <InputAdornment position="start">$</InputAdornment>,
+            }}
+            value={editForm.price}
+            onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleEditSubmit} disabled={actionLoading}>
+            {actionLoading ? <CircularProgress size={24} /> : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Artwork?</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete "{selectedArtwork?.title}"? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={handleDeleteConfirm} disabled={actionLoading}>
+            {actionLoading ? <CircularProgress size={24} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

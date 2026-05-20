@@ -5,7 +5,7 @@ const getFrontendBaseUrl = () => {
   return (
     process.env.FRONTEND_URL ||
     process.env.CLIENT_URL ||
-    'http://localhost:3000'
+    'https://art-hive.tech'
   );
 };
 
@@ -311,7 +311,7 @@ ${new Date().toLocaleString()}
       );
 
       // Backend URL
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = process.env.BACKEND_URL || 'https://art-hive.tech';
       const approveLink = `${backendUrl}/api/admin/approve-artist/${approveToken}`;
       const rejectLink = `${backendUrl}/api/admin/reject-artist/${rejectToken}`;
 
