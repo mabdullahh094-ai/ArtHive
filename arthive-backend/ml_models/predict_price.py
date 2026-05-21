@@ -9,11 +9,16 @@ import torch
 import os
 import sys
 import numpy as np
-import joblib
+import pickle
 from typing import Dict, List, Tuple
 from pathlib import Path
 from PIL import Image
 from torchvision import models, transforms
+
+try:
+    import joblib  # type: ignore
+except Exception:
+    joblib = None
 
 try:
     from analyze_image import analyze_image_quality, extract_dimensions_from_pixels
@@ -26,6 +31,15 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
 FEATURES_INFO_PATH = os.path.join(SCRIPT_DIR, 'features_info.json')
 LEGACY_MODEL_PATH = os.path.join(SCRIPT_DIR, 'price_model.pkl')
+
+
+def load_serialized_artifact(file_path):
+    """Load a serialized artifact using joblib when available, otherwise pickle."""
+    if joblib is not None:
+        return joblib.load(file_path)
+
+    with open(file_path, 'rb') as file_handle:
+        return pickle.load(file_handle)
 
 
 def resolve_model_path() -> str:
@@ -107,8 +121,8 @@ class PricePredictor:
 
             # Fallback to bundled legacy model artifacts.
             if os.path.exists(LEGACY_MODEL_PATH):
-                self.legacy_model = joblib.load(LEGACY_MODEL_PATH)
-                self.encoders = joblib.load(ENCODERS_PATH) if os.path.exists(ENCODERS_PATH) else {}
+                self.legacy_model = load_serialized_artifact(LEGACY_MODEL_PATH)
+                self.encoders = load_serialized_artifact(ENCODERS_PATH) if os.path.exists(ENCODERS_PATH) else {}
                 if os.path.exists(FEATURES_INFO_PATH):
                     with open(FEATURES_INFO_PATH, 'r', encoding='utf-8') as f:
                         self.features_info = json.load(f)
