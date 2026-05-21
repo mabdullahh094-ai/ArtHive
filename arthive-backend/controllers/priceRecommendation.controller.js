@@ -223,7 +223,7 @@ const predictPrice = async (req, res) => {
             confidence: prediction.confidence,
             currency: prediction.currency,
             model_type: 'image_based_pytorch',
-            model_location: 'C:\\Users\\11 TRDs\\Desktop\\Abdullah\\Scrapping\\models\\image_price_regressor_feedback_v2',
+            model_location: prediction.model_path || process.env.MODEL_DIR || process.env.MODEL_PATH || 'unknown',
             image_path: imagePathToUse
           }
         });

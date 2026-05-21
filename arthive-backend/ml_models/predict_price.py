@@ -16,10 +16,42 @@ from torchvision import models, transforms
 
 # Ensure we're in the correct directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Updated to use new model location
-MODEL_PATH = r'C:\Users\11 TRDs\Desktop\Abdullah\Scrapping\models\image_price_regressor_feedback_v2\best_model.pt'
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
 FEATURES_INFO_PATH = os.path.join(SCRIPT_DIR, 'features_info.json')
+
+
+def resolve_model_path() -> str:
+    """Resolve the image model checkpoint path for local and deployed environments."""
+    candidates = []
+
+    env_model_path = os.environ.get('MODEL_PATH')
+    env_model_dir = os.environ.get('MODEL_DIR')
+
+    if env_model_path:
+        candidates.append(env_model_path)
+
+    if env_model_dir:
+        candidates.extend([
+            os.path.join(env_model_dir, 'best_model.pt'),
+            os.path.join(env_model_dir, 'model.pt'),
+        ])
+
+    candidates.extend([
+        os.path.join(SCRIPT_DIR, 'best_model.pt'),
+        os.path.join(SCRIPT_DIR, 'model.pt'),
+        os.path.join(SCRIPT_DIR, 'models', 'best_model.pt'),
+        os.path.join(SCRIPT_DIR, 'models', 'model.pt'),
+        os.path.join(os.sep, 'models', 'image_price_regressor_feedback_v2', 'best_model.pt'),
+    ])
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    return candidates[0] if candidates else ''
+
+
+MODEL_PATH = resolve_model_path()
 
 
 def safe_print(message: str):
@@ -41,6 +73,9 @@ class PricePredictor:
         try:
             # Determine device
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            if not MODEL_PATH:
+                raise FileNotFoundError('No model path configured. Set MODEL_PATH or MODEL_DIR.')
             
             # Load model
             if not os.path.exists(MODEL_PATH):
@@ -144,6 +179,7 @@ class PricePredictor:
                 },
                 "confidence": 0.85,
                 "currency": "PKR",
+                "model_path": MODEL_PATH,
                 "image_path": image_path
             }
             
