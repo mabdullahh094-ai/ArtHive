@@ -13,10 +13,11 @@ export const CartProvider = ({ children }) => {
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const canUseBuyerFeatures = isAuthenticated && ["buyer", "user"].includes(String(user?.user_type || "").toLowerCase());
 
   // Fetch cart data
   const fetchCart = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!canUseBuyerFeatures) {
       // Don't fetch if user is not authenticated
       setCartItems([]);
       setWishlistItems([]);
@@ -125,18 +126,21 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [canUseBuyerFeatures]);
 
   // Initial fetch on mount (only when authenticated)
   useEffect(() => {
     console.log('CartContext: Auth state changed', { isAuthenticated, userId: user?.id });
-    if (isAuthenticated && user?.id) {
+    if (canUseBuyerFeatures && user?.id) {
       console.log('CartContext: Fetching wishlist for user:', user?.id);
       fetchCart();
     } else {
       console.log('CartContext: Not fetching - not authenticated or no user ID');
+      setCartItems([]);
+      setWishlistItems([]);
+      setLoading(false);
     }
-  }, [isAuthenticated, user?.id, fetchCart]);
+  }, [canUseBuyerFeatures, user?.id, fetchCart]);
 
   // Clear cart/wishlist when logging out (runs immediately when isAuthenticated becomes false)
   useEffect(() => {

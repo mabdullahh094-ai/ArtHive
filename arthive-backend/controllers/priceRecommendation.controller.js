@@ -156,9 +156,11 @@ function callPythonImageAnalyzer(imagePath) {
 const predictPrice = async (req, res) => {
   try {
     const { artworkData, imagePath } = req.body;
+    const uploadedImagePath = req.file?.path;
+    const resolvedImagePath = imagePath || artworkData?.imagePath || uploadedImagePath;
 
     // Validate input
-    if (!artworkData && !imagePath) {
+    if (!artworkData && !resolvedImagePath) {
       return res.status(400).json({
         success: false,
         error: 'Either artworkData or imagePath is required'
@@ -166,8 +168,8 @@ const predictPrice = async (req, res) => {
     }
 
     // NEW: Image-based prediction using PyTorch model
-    if (imagePath || artworkData?.imagePath) {
-      const imagePathToUse = imagePath || artworkData.imagePath;
+    if (resolvedImagePath) {
+      const imagePathToUse = resolvedImagePath;
       
       if (!fs.existsSync(imagePathToUse)) {
         return res.status(400).json({
@@ -311,7 +313,7 @@ const predictPrice = async (req, res) => {
 };
 
 /**
- * Call Python prediction script with image path (NEW - PyTorch model)
+ * Call Python prdiction script with image path (NEW - PyTorch model)
  * Returns promise with prediction result
  */
 function callPythonPredictorImage(imagePath) {

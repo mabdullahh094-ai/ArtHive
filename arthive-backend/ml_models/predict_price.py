@@ -21,6 +21,11 @@ MODEL_PATH = r'C:\Users\11 TRDs\Desktop\Abdullah\Scrapping\models\image_price_re
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
 FEATURES_INFO_PATH = os.path.join(SCRIPT_DIR, 'features_info.json')
 
+
+def safe_print(message: str):
+    """Print text using ASCII-safe output on Windows consoles."""
+    print(message.encode('ascii', 'replace').decode('ascii'))
+
 class PricePredictor:
     """Load and use trained model for price predictions"""
     
@@ -54,10 +59,10 @@ class PricePredictor:
             
             self.model = model
             self.is_loaded = True
-            print(f"[✓] Model loaded successfully! Using device: {self.device}")
+            safe_print(f"[OK] Model loaded successfully! Using device: {self.device}")
             
         except Exception as e:
-            print(f"[✗] Error loading model: {e}")
+            safe_print(f"[ERROR] Error loading model: {e}")
             self.is_loaded = False
     
     def preprocess_image(self, image_path: str) -> torch.Tensor:
@@ -181,8 +186,8 @@ def test_prediction():
     print(f"  - Image path: {test_image_path}")
     
     if not os.path.exists(test_image_path):
-        print(f"\n✗ Test image not found: {test_image_path}")
-        print("  Please provide a valid test image in ml_models/test_images/ directory")
+        safe_print(f"\n[ERROR] Test image not found: {test_image_path}")
+        safe_print("  Please provide a valid test image in ml_models/test_images/ directory")
         return
     
     print("\n[2] Running prediction...")
@@ -190,14 +195,14 @@ def test_prediction():
     result = predictor.predict(test_image_path)
     
     if result['success']:
-        print(f"\n✓ PREDICTION SUCCESSFUL!")
-        print(f"  - Predicted Price (PKR): {result['predicted_price_pkr']:,.2f}")
-        print(f"  - Price Range: PKR {result['price_range']['min']:,.2f} - PKR {result['price_range']['max']:,.2f}")
-        print(f"  - Confidence: {result['confidence']*100:.2f}%")
+        safe_print(f"\n[OK] PREDICTION SUCCESSFUL!")
+        safe_print(f"  - Predicted Price (PKR): {result['predicted_price_pkr']:,.2f}")
+        safe_print(f"  - Price Range: PKR {result['price_range']['min']:,.2f} - PKR {result['price_range']['max']:,.2f}")
+        safe_print(f"  - Confidence: {result['confidence']*100:.2f}%")
     else:
-        print(f"\n✗ PREDICTION FAILED: {result['error']}")
+        safe_print(f"\n[ERROR] PREDICTION FAILED: {result['error']}")
     
-    print("\n" + "=" * 60)
+    safe_print("\n" + "=" * 60)
 
 if __name__ == "__main__":
     # Support command-line usage: python predict_price.py <image_path>
@@ -207,8 +212,3 @@ if __name__ == "__main__":
         print(json.dumps(result))
     else:
         test_prediction()
-    
-    print("\n" + "=" * 60)
-
-if __name__ == "__main__":
-    test_prediction()
