@@ -140,7 +140,7 @@ export const CartProvider = ({ children }) => {
       setWishlistItems([]);
       setLoading(false);
     }
-  }, [canUseBuyerFeatures, user?.id, fetchCart]);
+  }, [canUseBuyerFeatures, isAuthenticated, user?.id, fetchCart]);
 
   // Clear cart/wishlist when logging out (runs immediately when isAuthenticated becomes false)
   useEffect(() => {
