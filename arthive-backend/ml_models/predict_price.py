@@ -9,15 +9,23 @@ import torch
 import os
 import sys
 import numpy as np
+import joblib
 from typing import Dict, List, Tuple
 from pathlib import Path
 from PIL import Image
 from torchvision import models, transforms
 
+try:
+    from analyze_image import analyze_image_quality, extract_dimensions_from_pixels
+except Exception:
+    analyze_image_quality = None
+    extract_dimensions_from_pixels = None
+
 # Ensure we're in the correct directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ENCODERS_PATH = os.path.join(SCRIPT_DIR, 'encoders.pkl')
 FEATURES_INFO_PATH = os.path.join(SCRIPT_DIR, 'features_info.json')
+LEGACY_MODEL_PATH = os.path.join(SCRIPT_DIR, 'price_model.pkl')
 
 
 def resolve_model_path() -> str:
@@ -66,6 +74,11 @@ class PricePredictor:
         self.model = None
         self.device = None
         self.is_loaded = False
+        self.legacy_model = None
+        self.encoders = None
+        self.features_info = None
+        self.model_mode = None
+        self.model_path = None
         self.load_model()
     
     def load_model(self):
@@ -74,27 +87,40 @@ class PricePredictor:
             # Determine device
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            if not MODEL_PATH:
-                raise FileNotFoundError('No model path configured. Set MODEL_PATH or MODEL_DIR.')
-            
-            # Load model
-            if not os.path.exists(MODEL_PATH):
-                raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
-            
-            # Create EfficientNet model architecture
-            model = models.efficientnet_b0(weights=None)
-            in_features = model.classifier[1].in_features
-            model.classifier[1] = torch.nn.Linear(in_features, 1)
-            
-            # Load checkpoint
-            ckpt = torch.load(MODEL_PATH, map_location=self.device)
-            model.load_state_dict(ckpt["model_state_dict"])
-            model.to(self.device)
-            model.eval()
-            
-            self.model = model
-            self.is_loaded = True
-            safe_print(f"[OK] Model loaded successfully! Using device: {self.device}")
+            # Prefer the image checkpoint if it exists.
+            if MODEL_PATH and os.path.exists(MODEL_PATH):
+                model = models.efficientnet_b0(weights=None)
+                in_features = model.classifier[1].in_features
+                model.classifier[1] = torch.nn.Linear(in_features, 1)
+
+                ckpt = torch.load(MODEL_PATH, map_location=self.device)
+                model.load_state_dict(ckpt["model_state_dict"])
+                model.to(self.device)
+                model.eval()
+
+                self.model = model
+                self.model_mode = 'image'
+                self.model_path = MODEL_PATH
+                self.is_loaded = True
+                safe_print(f"[OK] Image model loaded successfully! Using device: {self.device}")
+                return
+
+            # Fallback to bundled legacy model artifacts.
+            if os.path.exists(LEGACY_MODEL_PATH):
+                self.legacy_model = joblib.load(LEGACY_MODEL_PATH)
+                self.encoders = joblib.load(ENCODERS_PATH) if os.path.exists(ENCODERS_PATH) else {}
+                if os.path.exists(FEATURES_INFO_PATH):
+                    with open(FEATURES_INFO_PATH, 'r', encoding='utf-8') as f:
+                        self.features_info = json.load(f)
+                self.model_mode = 'legacy'
+                self.model_path = LEGACY_MODEL_PATH
+                self.is_loaded = True
+                safe_print(f"[OK] Legacy model loaded successfully! Using device: {self.device}")
+                return
+
+            raise FileNotFoundError(
+                f"No model found. Checked image checkpoint at {MODEL_PATH or 'unset'} and legacy model at {LEGACY_MODEL_PATH}."
+            )
             
         except Exception as e:
             safe_print(f"[ERROR] Error loading model: {e}")
@@ -156,37 +182,140 @@ class PricePredictor:
             }
         
         try:
-            # Preprocess image
-            x = self.preprocess_image(image_path)
-            
-            # Make prediction
-            with torch.no_grad():
-                pred_log = self.model(x.to(self.device))
-                pred_price = torch.expm1(pred_log).clamp(min=0.0).item()
-            
-            # Calculate price range (±PKR 25000)
-            price_range = {
-                "min": max(0, pred_price - 25000),
-                "max": pred_price + 25000
-            }
-            
-            return {
-                "success": True,
-                "predicted_price_pkr": round(float(pred_price), 2),
-                "price_range": {
-                    "min": round(float(price_range["min"]), 2),
-                    "max": round(float(price_range["max"]), 2)
-                },
-                "confidence": 0.85,
-                "currency": "PKR",
-                "model_path": MODEL_PATH,
-                "image_path": image_path
-            }
-            
+            if self.model_mode == 'image':
+                # Preprocess image
+                x = self.preprocess_image(image_path)
+
+                # Make prediction
+                with torch.no_grad():
+                    pred_log = self.model(x.to(self.device))
+                    pred_price = torch.expm1(pred_log).clamp(min=0.0).item()
+
+                price_range = {
+                    "min": max(0, pred_price - 25000),
+                    "max": pred_price + 25000
+                }
+
+                return {
+                    "success": True,
+                    "predicted_price_pkr": round(float(pred_price), 2),
+                    "price_range": {
+                        "min": round(float(price_range["min"]), 2),
+                        "max": round(float(price_range["max"]), 2)
+                    },
+                    "confidence": 0.85,
+                    "currency": "PKR",
+                    "model_path": self.model_path,
+                    "model_type": "image_checkpoint",
+                    "image_path": image_path
+                }
+
+            return self.predict_legacy(image_path)
+
         except Exception as e:
             return {
                 "success": False,
                 "error": f"Prediction error: {str(e)}"
+            }
+
+    def predict_legacy(self, image_path: str) -> Dict:
+        """Predict using the bundled RandomForest model and image-derived features."""
+        if self.legacy_model is None:
+            return {
+                "success": False,
+                "error": "Model not loaded"
+            }
+
+        if analyze_image_quality is None or extract_dimensions_from_pixels is None:
+            return {
+                "success": False,
+                "error": "Image analysis helpers not available"
+            }
+
+        image_metrics = analyze_image_quality(image_path)
+        if not image_metrics.get('success'):
+            return {
+                "success": False,
+                "error": image_metrics.get('error', 'Image analysis failed')
+            }
+
+        dimensions = extract_dimensions_from_pixels(image_metrics['width_px'], image_metrics['height_px'])
+
+        # Safe defaults for the non-image business fields used by the legacy model.
+        features = {
+            'width_cm': dimensions['width_cm'],
+            'height_cm': dimensions['height_cm'],
+            'size_cm2': dimensions['size_cm2'],
+            'aspect_ratio': dimensions['aspect_ratio'],
+            'medium': 'oil',
+            'style': 'impressionism',
+            'artist_experience_years': 5,
+            'artist_previous_sales': 0,
+            'artist_reputation_score': 3.0,
+            'country': 'Pakistan',
+            'is_original': 1,
+            'edition_size': 1,
+            'condition': 'good',
+            'year_created': 2024,
+            'time_taken_hours': 10,
+            'ai_quality_score': image_metrics['quality_score'],
+            'ai_authenticity_score': image_metrics['authenticity_score'],
+            'image_brightness_score': image_metrics['brightness_score'],
+            'image_contrast_score': image_metrics['contrast_score'],
+            'composition_score': image_metrics['composition_score'],
+            'color_harmony_score': image_metrics['color_harmony_score'],
+            'subject_complexity_score': 0.75,
+            'market_demand_index': 0.50,
+        }
+
+        try:
+            feature_order = []
+            if self.features_info:
+                feature_order = self.features_info.get('numerical_features', []) + self.features_info.get('categorical_features', [])
+            if not feature_order:
+                feature_order = [
+                    'width_cm', 'height_cm', 'size_cm2', 'aspect_ratio',
+                    'artist_experience_years', 'artist_previous_sales', 'artist_reputation_score',
+                    'edition_size', 'year_created', 'time_taken_hours',
+                    'ai_quality_score', 'ai_authenticity_score', 'image_brightness_score',
+                    'image_contrast_score', 'composition_score', 'color_harmony_score',
+                    'subject_complexity_score', 'market_demand_index',
+                    'medium', 'style', 'country', 'is_original', 'condition'
+                ]
+
+            row = []
+            for feature in feature_order:
+                value = features[feature]
+                if feature in self.encoders:
+                    encoder = self.encoders[feature]
+                    value = encoder.transform([str(value)])[0]
+                row.append(value)
+
+            X = np.array([row], dtype=float)
+            pred_price = float(self.legacy_model.predict(X)[0])
+            price_range = {
+                'min': max(0, pred_price * 0.85),
+                'max': pred_price * 1.15,
+            }
+
+            return {
+                'success': True,
+                'predicted_price_pkr': round(pred_price, 2),
+                'price_range': {
+                    'min': round(float(price_range['min']), 2),
+                    'max': round(float(price_range['max']), 2),
+                },
+                'confidence': 0.72,
+                'currency': 'PKR',
+                'model_path': self.model_path,
+                'model_type': 'legacy_random_forest',
+                'image_path': image_path,
+                'artwork_features': features,
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Legacy prediction error: {str(e)}'
             }
 
 # Global predictor instance
