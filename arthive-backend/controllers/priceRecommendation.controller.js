@@ -3,13 +3,39 @@
  * Handles AI-based price prediction for artworks
  */
 
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 // Path to Python scripts
 const PREDICT_SCRIPT = path.join(__dirname, '../ml_models/predict_price.py');
 const ANALYZE_IMAGE_SCRIPT = path.join(__dirname, '../ml_models/analyze_image.py');
+
+let resolvedPythonCommand = null;
+
+function resolvePythonCommand() {
+  if (resolvedPythonCommand) {
+    return resolvedPythonCommand;
+  }
+
+  const candidates = [
+    process.env.PYTHON_EXECUTABLE,
+    process.env.PYTHON_BIN,
+    'python3',
+    'python',
+    'py',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ['--version'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) {
+      resolvedPythonCommand = candidate;
+      return resolvedPythonCommand;
+    }
+  }
+
+  throw new Error('No Python executable found. Set PYTHON_EXECUTABLE or install python3/python/py on the server.');
+}
 
 /**
  * Analyze artwork image for quality metrics
@@ -84,7 +110,8 @@ const analyzeImage = async (req, res) => {
 function callPythonImageAnalyzer(imagePath) {
   return new Promise((resolve, reject) => {
     try {
-      const pythonProcess = spawn('python', [ANALYZE_IMAGE_SCRIPT, imagePath]);
+      const pythonCommand = resolvePythonCommand();
+      const pythonProcess = spawn(pythonCommand, [ANALYZE_IMAGE_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
@@ -320,7 +347,8 @@ function callPythonPredictorImage(imagePath) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process with image path as argument
-      const pythonProcess = spawn('python', [PREDICT_SCRIPT, imagePath]);
+      const pythonCommand = resolvePythonCommand();
+      const pythonProcess = spawn(pythonCommand, [PREDICT_SCRIPT, imagePath]);
 
       let outputData = '';
       let errorData = '';
@@ -396,7 +424,8 @@ function callPythonPredictor(features) {
   return new Promise((resolve, reject) => {
     try {
       // Spawn Python process
-      const pythonProcess = spawn('python', [PREDICT_SCRIPT]);
+      const pythonCommand = resolvePythonCommand();
+      const pythonProcess = spawn(pythonCommand, [PREDICT_SCRIPT]);
 
       let outputData = '';
       let errorData = '';
@@ -479,7 +508,8 @@ with contextlib.redirect_stdout(io.StringIO()):
 print(json.dumps(result))
 `;
 
-  const pythonProcess = spawn('python', ['-c', pythonCode, JSON.stringify(features)]);
+  const pythonCommand = resolvePythonCommand();
+  const pythonProcess = spawn(pythonCommand, ['-c', pythonCode, JSON.stringify(features)]);
     let outputData = '';
 
     pythonProcess.stdout.on('data', (data) => {
